@@ -1254,36 +1254,23 @@ body {
   overflow: hidden;
 }
 
-.screen-canvas-wrapper {
-  width: 100%;
-  max-width: 100%;
-  border-radius: var(--radius);
-  background: var(--card);
-  border: 1px solid var(--border);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 220px;
-}
 
 .screen-img-display {
-  width: 100%;
-  height: auto;
-  max-height: calc(100vh - 280px);
-  object-fit: contain;
+  /* Render at NATURAL pixel dimensions — baseScale CSS transform fits it to the container.
+     This means zooming in reveals actual decoded pixel data instead of stretching
+     a downsampled version — identical to how iOS Photos / Google Photos zoom works. */
   display: block;
+  width: auto;
+  height: auto;
+  max-width: none;   /* critical: do NOT constrain to container width */
+  max-height: none;
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
-  border-radius: var(--radius-sm);
-  transition: box-shadow 0.3s ease;
-}
-
-.screen-img-display:active {
-  box-shadow: 0 0 16px rgba(168, 85, 247, 0.4);
+  /* High-quality interpolation — bilinear/bicubic when browser scales */
+  image-rendering: auto;
+  image-rendering: -webkit-optimize-contrast;  /* Safari sharpening */
+  -ms-interpolation-mode: bicubic;
 }
 
 .screen-placeholder {
@@ -1465,31 +1452,37 @@ body {
   margin-left: 2px;
 }
 
-/* ══════════════════════════════════════════════════
-   ZOOM / PAN WRAPPER
-══════════════════════════════════════════════════ */
-.screen-zoom-wrapper {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  position: relative;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  cursor: crosshair;
-}
 
 .screen-img-transformable {
-  width: 100%;
-  height: 100%;
+  /* Must be exactly the natural image size so transform-origin: 0 0 works correctly */
+  display: inline-block;
+  line-height: 0;             /* remove inline gap below img */
   will-change: transform;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
-/* Let canvas wrapper fill remaining vertical space */
+/* canvas-wrapper is the clipping viewport — overflow:hidden keeps image contained */
 .screen-canvas-wrapper {
   flex: 1;
   min-height: 0;
   width: 100%;
+  overflow: hidden;       /* clips the natural-size image */
+  position: relative;
+  border-radius: var(--radius);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+}
+
+.screen-zoom-wrapper {
+  position: absolute;     /* fills the canvas-wrapper */
+  inset: 0;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: crosshair;
 }
 
 /* Screen mouse buttons - inherits mouse-btn styles, no flex:1 override needed */
@@ -1645,3 +1638,300 @@ body {
   padding: 7px 9px;
   font-size: 12px;
 }
+
+/* ══════════════════════════════════════════════════
+   CLICK MODE SELECTOR
+══════════════════════════════════════════════════ */
+.click-mode-selector {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0 2px;
+}
+
+.click-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--md-sys-color-surface-container);
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-pill);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+
+.click-mode-btn:active {
+  transform: scale(0.95);
+}
+
+/* Left click active */
+.click-mode-btn.active {
+  background: rgba(208, 188, 255, 0.15);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  box-shadow: 0 0 12px rgba(208, 188, 255, 0.2);
+}
+
+/* Right click active */
+.click-mode-btn.active.right {
+  background: rgba(242, 184, 181, 0.15);
+  border-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-error);
+  box-shadow: 0 0 12px rgba(242, 184, 181, 0.2);
+}
+
+/* Double click active */
+.click-mode-btn.active.double {
+  background: rgba(129, 201, 149, 0.15);
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 12px rgba(129, 201, 149, 0.2);
+}
+
+.double-click-icon {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* ══════════════════════════════════════════════════
+   TRIGGER BUTTONS (hold to click)
+══════════════════════════════════════════════════ */
+.trigger-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 100%;
+  height: 52px;
+}
+
+.trigger-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--md-sys-color-surface-container-high);
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-md);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.1s, transform 0.08s, border-color 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Ripple press effect */
+.trigger-btn:active {
+  transform: scale(0.94);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+/* Glow when the trigger matches the active mode */
+.trigger-btn.mode-active {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 2px rgba(208, 188, 255, 0.2),
+              inset 0 0 12px rgba(208, 188, 255, 0.06);
+}
+
+.trigger-left.mode-active {
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+}
+
+.trigger-right.mode-active {
+  border-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-error);
+  box-shadow: 0 0 0 2px rgba(242, 184, 181, 0.2),
+              inset 0 0 12px rgba(242, 184, 181, 0.06);
+}
+
+/* Middle trigger + scroll combo */
+.trigger-middle-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 0 0 auto;
+  width: 52px;
+}
+
+.trigger-middle {
+  flex: 1;
+  min-width: unset;
+  border-radius: var(--radius-sm);
+  padding: 4px;
+  font-size: 12px;
+}
+
+.trigger-scroll-btns {
+  display: flex;
+  gap: 3px;
+  height: 18px;
+}
+
+.scroll-mini-btn {
+  flex: 1;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: 4px;
+  color: var(--md-sys-color-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: none;
+  transition: background 0.1s;
+}
+
+.scroll-mini-btn:active {
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+/* ══════════════════════════════════════════════════
+   ZOOM TOOLBAR
+══════════════════════════════════════════════════ */
+.screen-zoom-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  flex-shrink: 0;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-pill);
+  padding: 6px 10px;
+}
+
+.zoom-step-btn {
+  background: none;
+  border: none;
+  color: var(--md-sys-color-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.zoom-step-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--md-sys-color-on-surface);
+}
+
+.zoom-step-btn:active {
+  transform: scale(0.88);
+  background: rgba(255,255,255,0.1);
+}
+
+.zoom-slider-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.zoom-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--md-sys-color-outline-variant);
+  outline: none;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 4px rgba(208, 188, 255, 0.2);
+  cursor: grab;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+
+.zoom-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+  transform: scale(1.15);
+  box-shadow: 0 0 0 6px rgba(208, 188, 255, 0.25);
+}
+
+.zoom-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  border: none;
+  cursor: grab;
+}
+
+.zoom-slider-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface-variant);
+  min-width: 32px;
+  text-align: right;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.zoom-toolbar-divider {
+  width: 1px;
+  height: 18px;
+  background: var(--md-sys-color-outline-variant);
+  flex-shrink: 0;
+  margin: 0 2px;
+}
+
+.zoom-toolbar-btn {
+  background: none;
+  border: none;
+  color: var(--md-sys-color-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.zoom-toolbar-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: var(--md-sys-color-on-surface);
+}
+
+.zoom-toolbar-btn:active {
+  transform: scale(0.88);
+}
+
+.zoom-toolbar-btn.active {
+  color: var(--md-sys-color-primary);
+  background: rgba(208, 188, 255, 0.1);
+}
+
