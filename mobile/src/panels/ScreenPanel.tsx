@@ -1,371 +1,317 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { ws } from "../ws";
+import {
+  Monitor, MousePointerClick, Disc, ChevronUp, ChevronDown,
+  ZoomIn, ZoomOut, RotateCcw, Keyboard as KeyboardIcon, PictureInPicture
+} from "lucide-react";
 
 /* ── Types ──────────────────────────────────────────────────── */
-interface PCDimensions {
-  width: number;
-  height: number;
-}
-
+interface PCDimensions { width: number; height: number; }
 interface MonitorInfo {
-  index: number;
-  name: string;
-  width: number;
-  height: number;
-  is_primary: boolean;
+  index: number; name: string;
+  width: number; height: number; is_primary: boolean;
 }
 
-/* ── Helpers ────────────────────────────────────────────────── */
+/* ── Helpers ─────────────────────────────────────────────────── */
 function dist(a: React.Touch, b: React.Touch) {
-  const dx = a.clientX - b.clientX;
-  const dy = a.clientY - b.clientY;
+  const dx = a.clientX - b.clientX, dy = a.clientY - b.clientY;
   return Math.sqrt(dx * dx + dy * dy);
 }
-
-function midpoint(a: React.Touch, b: React.Touch) {
+function mid(a: React.Touch, b: React.Touch) {
   return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
 }
 
-const ZOOM_MIN = 1;
-const ZOOM_MAX = 6;
-const ZOOM_STEP = 0.5;
+const ZOOM_MIN = 1, ZOOM_MAX = 10, ZOOM_STEP = 0.5;
 
 /* ════════════════════════════════════════════════════════════ */
 export default function ScreenPanel() {
-  const [frameSrc, setFrameSrc] = useState<string>("");
-  const [pcDimensions, setPcDimensions] = useState<PCDimensions>({
-    width: 1920,
-    height: 1080,
-  });
-  const [clickMode, setClickMode] = useState<"left" | "right" | "double">(
-    "left"
-  );
+  const [frameSrc, setFrameSrc]         = useState<string>("");
+  const [pcDim, setPcDim]               = useState<PCDimensions>({ width: 1920, height: 1080 });
+  const [clickMode, setClickMode]       = useState<"left" | "right" | "double">("left");
   const [showKeyboard, setShowKeyboard] = useState(false);
-  const [textInput, setTextInput] = useState("");
-
-  // Monitor state
-  const [monitors, setMonitors] = useState<MonitorInfo[]>([]);
+  const [textInput, setTextInput]       = useState("");
+  const [monitors, setMonitors]         = useState<MonitorInfo[]>([]);
   const [activeMonitor, setActiveMonitor] = useState(0);
+  const [pip, setPip]                   = useState(false);
+  const [pipPos, setPipPos]             = useState({ x: 16, y: 16 });
 
-  // Zoom / pan state
-  const [zoom, setZoom] = useState(1);
-  const [panX, setPanX] = useState(0);
-  const [panY, setPanY] = useState(0);
+  /* ── Refs for zero-re-render pan/zoom ────────────────────── */
+  const transformRef = useRef({ z: 1, x: 0, y: 0 });  // live transform state
+  const transformableRef = useRef<HTMLDivElement>(null); // the scaled div
+  const badgeRef         = useRef<HTMLDivElement>(null); // zoom badge
+  const cursorRef        = useRef<HTMLDivElement>(null); // pointer overlay
 
-  // PiP state
-  const [pip, setPip] = useState(false);
-  const [pipPos, setPipPos] = useState({ x: 16, y: 16 }); // distance from top-right
-
-  const imageRef = useRef<HTMLImageElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const imageRef   = useRef<HTMLImageElement>(null);
+  const inputRef   = useRef<HTMLInputElement>(null);
 
-  // Touch tracking refs (avoid re-renders)
-  const touchState = useRef({
-    lastTouchCount: 0,
-    lastPinchDist: 0,
-    lastPinchMid: { x: 0, y: 0 },
-    lastSinglePos: { x: 0, y: 0 },
-    isDragging: false,
-    // PiP drag
-    pipDragging: false,
-    pipDragStart: { touchX: 0, touchY: 0, posX: 0, posY: 0 },
-  });
+  /* ── Apply transform directly to DOM — no setState ──────── */
+  const applyDOM = useCallback(() => {
+    const t = transformRef.current;
+    if (transformableRef.current) {
+      transformableRef.current.style.transform =
+        `translate(${t.x}px, ${t.y}px) scale(${t.z})`;
+    }
+    if (badgeRef.current) {
+      badgeRef.current.textContent = `${t.z.toFixed(1)}×`;
+      badgeRef.current.style.display = t.z > 1.05 ? "block" : "none";
+    }
+  }, []);
 
-  // Keep zoom/pan in a ref so touch handlers don't stale-close
-  const zoomRef = useRef(zoom);
-  const panRef = useRef({ x: panX, y: panY });
-  zoomRef.current = zoom;
-  panRef.current = { x: panX, y: panY };
-
-  /* ── WebSocket lifecycle ─────────────────────────────────── */
-  useEffect(() => {
-    // Request monitor list on mount
-    ws.send({ type: "get_monitors" });
-
-    // Start stream on default monitor
-    ws.send({ type: "start_screen_stream", monitor_index: 0 });
-
-    const removeHandler = ws.addMessageHandler((msg: any) => {
-      if (msg.type === "monitors_list") {
-        setMonitors(msg.monitors || []);
-      } else if (msg.type === "screen_info") {
-        setPcDimensions({
-          width: msg.width || 1920,
-          height: msg.height || 1080,
-        });
-      } else if (msg.type === "screen_frame") {
-        setFrameSrc(msg.image || "");
-      }
-    });
-
-    return () => {
-      ws.send({ type: "stop_screen_stream" });
-      removeHandler();
+  /* ── Clamp pan so image stays within wrapper ─────────────── */
+  const clamp = useCallback((x: number, y: number, z: number) => {
+    const w = wrapperRef.current;
+    if (!w) return { x, y };
+    const maxX = w.clientWidth  * (z - 1);
+    const maxY = w.clientHeight * (z - 1);
+    return {
+      x: Math.max(-maxX, Math.min(0, x)),
+      y: Math.max(-maxY, Math.min(0, y)),
     };
+  }, []);
+
+  /* ── Coordinate mapping: client px → PC absolute px ─────── */
+  const clientToPC = useCallback((cx: number, cy: number) => {
+    const w = wrapperRef.current;
+    if (!w) return null;
+    const rect = w.getBoundingClientRect();
+    const { z, x, y } = transformRef.current;
+    const imgX = (cx - rect.left - x) / z;
+    const imgY = (cy - rect.top  - y) / z;
+    const fx   = imgX / rect.width;
+    const fy   = imgY / rect.height;
+    return {
+      x: Math.round(Math.max(0, Math.min(1, fx)) * pcDim.width),
+      y: Math.round(Math.max(0, Math.min(1, fy)) * pcDim.height),
+    };
+  }, [pcDim]);
+
+  /* ── Update cursor overlay position ─────────────────────── */
+  const moveCursor = useCallback((cx: number, cy: number) => {
+    const cur = cursorRef.current;
+    const w   = wrapperRef.current;
+    if (!cur || !w) return;
+    const rect = w.getBoundingClientRect();
+    // Clamp to wrapper bounds
+    const lx = Math.max(0, Math.min(rect.width,  cx - rect.left));
+    const ly = Math.max(0, Math.min(rect.height, cy - rect.top));
+    cur.style.left    = `${lx}px`;
+    cur.style.top     = `${ly}px`;
+    cur.style.display = "block";
+  }, []);
+
+  const hideCursor = useCallback(() => {
+    if (cursorRef.current) cursorRef.current.style.display = "none";
+  }, []);
+
+  /* ── WebSocket ───────────────────────────────────────────── */
+  useEffect(() => {
+    ws.send({ type: "get_monitors" });
+    ws.send({ type: "start_screen_stream", monitor_index: 0 });
+    const remove = ws.addMessageHandler((msg: any) => {
+      if      (msg.type === "monitors_list") setMonitors(msg.monitors || []);
+      else if (msg.type === "screen_info")   setPcDim({ width: msg.width || 1920, height: msg.height || 1080 });
+      else if (msg.type === "screen_frame")  setFrameSrc(msg.image || "");
+    });
+    return () => { ws.send({ type: "stop_screen_stream" }); remove(); };
   }, []);
 
   /* ── Monitor switching ───────────────────────────────────── */
   const switchMonitor = (idx: number) => {
     if (idx === activeMonitor) return;
     setActiveMonitor(idx);
-    setZoom(1);
-    setPanX(0);
-    setPanY(0);
+    transformRef.current = { z: 1, x: 0, y: 0 };
+    applyDOM();
     ws.send({ type: "stop_screen_stream" });
     ws.send({ type: "start_screen_stream", monitor_index: idx });
   };
 
-  /* ── Coordinate mapping ──────────────────────────────────── */
-  const clientToPC = useCallback(
-    (clientX: number, clientY: number) => {
-      if (!imageRef.current) return null;
-      const rect = imageRef.current.getBoundingClientRect();
+  /* ── Click ───────────────────────────────────────────────── */
+  const doClick = useCallback((cx: number, cy: number) => {
+    const pc = clientToPC(cx, cy);
+    if (!pc) return;
+    ws.send({ type: "mouse_move_abs", x: pc.x, y: pc.y });
+    if      (clickMode === "left")   ws.send({ type: "mouse_click", button: "left" });
+    else if (clickMode === "right")  ws.send({ type: "mouse_click", button: "right" });
+    else {
+      ws.send({ type: "mouse_click", button: "left" });
+      setTimeout(() => ws.send({ type: "mouse_click", button: "left" }), 80);
+    }
+  }, [clickMode, clientToPC]);
 
-      // When zoomed, the rendered image is "transform: scale(zoom)" from its origin.
-      // We need to map click inside the visible (clipped) area back to the real image coords.
-      const z = zoomRef.current;
-      const px = panRef.current.x;
-      const py = panRef.current.y;
+  /* ── Touch state ─────────────────────────────────────────── */
+  const ts = useRef({
+    lastCount: 0,
+    pinchDist: 0,
+    pinchMid:  { x: 0, y: 0 },
+    singlePos: { x: 0, y: 0 },
+    dragged:   false,
+    pipDragging: false,
+    pipStart:    { tx: 0, ty: 0, px: 0, py: 0 },
+  });
 
-      // Work in CSS-pixel space on the image element
-      const imgW = rect.width;
-      const imgH = rect.height;
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const s = ts.current;
+    s.lastCount = e.touches.length;
 
-      const rawImgX = clientX - rect.left; // CSS pixels inside img element
-      const rawImgY = clientY - rect.top;
+    if (e.touches.length === 2) {
+      s.pinchDist = dist(e.touches[0], e.touches[1]);
+      s.pinchMid  = mid(e.touches[0], e.touches[1]);
+      s.dragged   = false;
+      hideCursor();
+    } else if (e.touches.length === 1) {
+      s.singlePos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      s.dragged   = false;
+      moveCursor(e.touches[0].clientX, e.touches[0].clientY);
+    }
+  }, [moveCursor, hideCursor]);
 
-      // Invert the CSS transform: translate(panX px, panY px) scale(zoom)
-      // transformed point = zoom*(orig + pan)
-      // => orig = (point/zoom) - pan
-      const origX = rawImgX / z - px;
-      const origY = rawImgY / z - py;
+  const handleTouchMove = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const s = ts.current;
+    const t = transformRef.current;
 
-      const fracX = origX / imgW;
-      const fracY = origY / imgH;
+    if (e.touches.length === 2) {
+      /* ─── Focal-point pinch-to-zoom ────────────────────────
+         Key formula: pan_new = pan_old + focal × (1/z_old − 1/z_new)
+         This keeps the content under the pinch midpoint fixed.     */
+      const newDist = dist(e.touches[0], e.touches[1]);
+      const newMid  = mid(e.touches[0], e.touches[1]);
+      const w       = wrapperRef.current;
 
-      const absX = Math.round(Math.max(0, Math.min(1, fracX)) * pcDimensions.width);
-      const absY = Math.round(
-        Math.max(0, Math.min(1, fracY)) * pcDimensions.height
-      );
-      return { x: absX, y: absY };
-    },
-    [pcDimensions]
-  );
+      if (w && s.pinchDist > 0) {
+        const ratio  = newDist / s.pinchDist;
+        const prevZ  = t.z;
+        const nextZ  = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, prevZ * ratio));
 
-  /* ── Click / interaction ─────────────────────────────────── */
-  const doClick = useCallback(
-    (clientX: number, clientY: number) => {
-      const pc = clientToPC(clientX, clientY);
-      if (!pc) return;
-      ws.send({ type: "mouse_move_abs", x: pc.x, y: pc.y });
+        const rect   = w.getBoundingClientRect();
+        const focalX = newMid.x - rect.left;
+        const focalY = newMid.y - rect.top;
 
-      if (clickMode === "left") {
-        ws.send({ type: "mouse_click", button: "left" });
-      } else if (clickMode === "right") {
-        ws.send({ type: "mouse_click", button: "right" });
+        // Zoom toward focal point
+        let nx = t.x + focalX * (1 / prevZ - 1 / nextZ);
+        let ny = t.y + focalY * (1 / prevZ - 1 / nextZ);
+
+        // Also pan with midpoint translation
+        nx += newMid.x - s.pinchMid.x;
+        ny += newMid.y - s.pinchMid.y;
+
+        const c  = clamp(nx, ny, nextZ);
+        t.z      = nextZ;
+        t.x      = c.x;
+        t.y      = c.y;
+        applyDOM();
+      }
+      s.pinchDist = newDist;
+      s.pinchMid  = newMid;
+      s.dragged   = false;
+    } else if (e.touches.length === 1) {
+      const touch = e.touches[0];
+      const dx    = touch.clientX - s.singlePos.x;
+      const dy    = touch.clientY - s.singlePos.y;
+
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) s.dragged = true;
+
+      if (t.z > 1.05) {
+        // Pan
+        const c = clamp(t.x + dx, t.y + dy, t.z);
+        t.x = c.x; t.y = c.y;
+        applyDOM();
+        hideCursor();
       } else {
-        ws.send({ type: "mouse_click", button: "left" });
-        setTimeout(() => ws.send({ type: "mouse_click", button: "left" }), 80);
+        // Move PC cursor
+        const pc = clientToPC(touch.clientX, touch.clientY);
+        if (pc) ws.send({ type: "mouse_move_abs", x: pc.x, y: pc.y });
+        moveCursor(touch.clientX, touch.clientY);
       }
-    },
-    [clickMode, clientToPC]
-  );
+      s.singlePos = { x: touch.clientX, y: touch.clientY };
+    }
+  }, [clamp, clientToPC, applyDOM, moveCursor, hideCursor]);
 
-  /* ── Clamp pan so image can't be panned off-screen ───────── */
-  const clampPan = useCallback(
-    (px: number, py: number, z: number) => {
-      if (!imageRef.current) return { x: px, y: py };
-      const rect = imageRef.current.getBoundingClientRect();
-      const imgW = rect.width;
-      const imgH = rect.height;
-      // max pan in CSS pixels of the underlying image
-      const maxPx = (imgW * (z - 1)) / z;
-      const maxPy = (imgH * (z - 1)) / z;
-      return {
-        x: Math.max(-maxPx, Math.min(0, px)),
-        y: Math.max(-maxPy, Math.min(0, py)),
-      };
-    },
-    []
-  );
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const s = ts.current;
+    if (!s.dragged && s.lastCount === 1 && e.changedTouches.length === 1) {
+      doClick(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+    }
+    s.dragged   = false;
+    s.lastCount = e.touches.length;
+    if (e.touches.length === 0) hideCursor();
+  }, [doClick, hideCursor]);
 
-  /* ── Touch handlers ──────────────────────────────────────── */
-  const handleTouchStart = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const ts = touchState.current;
-      ts.lastTouchCount = e.touches.length;
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.button === 0) doClick(e.clientX, e.clientY);
+  }, [doClick]);
 
-      if (e.touches.length === 2) {
-        // Init pinch
-        ts.lastPinchDist = dist(e.touches[0], e.touches[1]);
-        ts.lastPinchMid = midpoint(e.touches[0], e.touches[1]);
-        ts.isDragging = false;
-      } else if (e.touches.length === 1) {
-        ts.lastSinglePos = {
-          x: e.touches[0].clientX,
-          y: e.touches[0].clientY,
-        };
-        ts.isDragging = false;
-      }
-    },
-    []
-  );
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    moveCursor(e.clientX, e.clientY);
+    const pc = clientToPC(e.clientX, e.clientY);
+    if (pc) ws.send({ type: "mouse_move_abs", x: pc.x, y: pc.y });
+  }, [moveCursor, clientToPC]);
 
-  const handleTouchMove = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const ts = touchState.current;
+  /* ── Zoom buttons (zoom toward center) ───────────────────── */
+  const zoomStep = useCallback((delta: number) => {
+    const t    = transformRef.current;
+    const prevZ = t.z;
+    const nextZ = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX,
+      parseFloat((prevZ + delta).toFixed(1))));
+    if (nextZ === prevZ) return;
+    const w = wrapperRef.current;
+    if (w) {
+      const cx = w.clientWidth / 2, cy = w.clientHeight / 2;
+      let nx = t.x + cx * (1 / prevZ - 1 / nextZ);
+      let ny = t.y + cy * (1 / prevZ - 1 / nextZ);
+      if (nextZ <= 1) { nx = 0; ny = 0; }
+      const c = clamp(nx, ny, nextZ);
+      t.z = nextZ; t.x = c.x; t.y = c.y;
+    } else {
+      t.z = nextZ;
+      if (nextZ <= 1) { t.x = 0; t.y = 0; }
+    }
+    applyDOM();
+  }, [clamp, applyDOM]);
 
-      if (e.touches.length === 2) {
-        // ── Pinch-to-zoom ──────────────────────────────────────
-        const newDist = dist(e.touches[0], e.touches[1]);
-        const ratio = newDist / (ts.lastPinchDist || newDist);
-        ts.lastPinchDist = newDist;
-
-        setZoom((prev) => {
-          const next = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, prev * ratio));
-          zoomRef.current = next;
-          return next;
-        });
-        ts.isDragging = false;
-      } else if (e.touches.length === 1) {
-        const t = e.touches[0];
-        const dx = t.clientX - ts.lastSinglePos.x;
-        const dy = t.clientY - ts.lastSinglePos.y;
-
-        if (Math.abs(dx) > 3 || Math.abs(dy) > 3) ts.isDragging = true;
-
-        if (zoomRef.current > 1.05) {
-          // ── Pan while zoomed ─────────────────────────────────
-          setPanX((px) => {
-            const next = px + dx / zoomRef.current;
-            const clamped = clampPan(next, panRef.current.y, zoomRef.current);
-            panRef.current.x = clamped.x;
-            return clamped.x;
-          });
-          setPanY((py) => {
-            const next = py + dy / zoomRef.current;
-            const clamped = clampPan(panRef.current.x, next, zoomRef.current);
-            panRef.current.y = clamped.y;
-            return clamped.y;
-          });
-        } else {
-          // ── Move PC cursor ───────────────────────────────────
-          const pc = clientToPC(t.clientX, t.clientY);
-          if (pc) ws.send({ type: "mouse_move_abs", x: pc.x, y: pc.y });
-        }
-
-        ts.lastSinglePos = { x: t.clientX, y: t.clientY };
-      }
-    },
-    [clampPan, clientToPC]
-  );
-
-  const handleTouchEnd = useCallback(
-    (e: React.TouchEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      const ts = touchState.current;
-      // Tap = touch ended without significant drag
-      if (!ts.isDragging && ts.lastTouchCount === 1 && e.changedTouches.length === 1) {
-        const t = e.changedTouches[0];
-        doClick(t.clientX, t.clientY);
-      }
-      ts.isDragging = false;
-      ts.lastTouchCount = e.touches.length;
-    },
-    [doClick]
-  );
-
-  /* ── Mouse fallback (desktop testing) ───────────────────── */
-  const handleMouseDown = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      if (e.button === 0) doClick(e.clientX, e.clientY);
-    },
-    [doClick]
-  );
-
-  /* ── Zoom controls ───────────────────────────────────────── */
-  const zoomIn = () =>
-    setZoom((z) => Math.min(ZOOM_MAX, parseFloat((z + ZOOM_STEP).toFixed(1))));
-  const zoomOut = () => {
-    setZoom((z) => {
-      const next = Math.max(ZOOM_MIN, parseFloat((z - ZOOM_STEP).toFixed(1)));
-      if (next <= 1) { setPanX(0); setPanY(0); }
-      return next;
-    });
-  };
-  const zoomReset = () => {
-    setZoom(1);
-    setPanX(0);
-    setPanY(0);
-  };
+  const zoomReset = useCallback(() => {
+    transformRef.current = { z: 1, x: 0, y: 0 };
+    applyDOM();
+  }, [applyDOM]);
 
   /* ── PiP drag ────────────────────────────────────────────── */
   const handlePipTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    const ts = touchState.current;
-    ts.pipDragging = true;
-    ts.pipDragStart = {
-      touchX: e.touches[0].clientX,
-      touchY: e.touches[0].clientY,
-      posX: pipPos.x,
-      posY: pipPos.y,
-    };
+    ts.current.pipDragging = true;
+    ts.current.pipStart    = { tx: e.touches[0].clientX, ty: e.touches[0].clientY, px: pipPos.x, py: pipPos.y };
   };
-
   const handlePipTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    if (!touchState.current.pipDragging) return;
-    const ds = touchState.current.pipDragStart;
-    const dx = e.touches[0].clientX - ds.touchX;
-    const dy = e.touches[0].clientY - ds.touchY;
-    setPipPos({
-      x: Math.max(8, ds.posX - dx),  // x = right offset
-      y: Math.max(8, ds.posY + dy),
-    });
+    if (!ts.current.pipDragging) return;
+    const { tx, ty, px, py } = ts.current.pipStart;
+    setPipPos({ x: Math.max(8, px - (e.touches[0].clientX - tx)), y: Math.max(8, py + (e.touches[0].clientY - ty)) });
   };
-
   const handlePipTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
-    e.stopPropagation();
-    touchState.current.pipDragging = false;
+    e.stopPropagation(); ts.current.pipDragging = false;
   };
 
-  /* ── Keyboard (Quick Type) ───────────────────────────────── */
+  /* ── Keyboard ────────────────────────────────────────────── */
   const toggleKeyboard = () => {
-    setShowKeyboard((v) => !v);
+    setShowKeyboard(v => !v);
     if (!showKeyboard) setTimeout(() => inputRef.current?.focus(), 150);
   };
-
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    let commonPrefixLen = 0;
-    while (
-      commonPrefixLen < textInput.length &&
-      commonPrefixLen < newValue.length &&
-      textInput[commonPrefixLen] === newValue[commonPrefixLen]
-    ) {
-      commonPrefixLen++;
-    }
-    const backspaces = textInput.length - commonPrefixLen;
-    const addedText = newValue.slice(commonPrefixLen);
-    for (let i = 0; i < backspaces; i++)
-      ws.send({ type: "key_press", key: "backspace" });
-    if (addedText) ws.send({ type: "text", text: addedText });
-    setTextInput(newValue);
+    const nv = e.target.value;
+    let cp = 0;
+    while (cp < textInput.length && cp < nv.length && textInput[cp] === nv[cp]) cp++;
+    for (let i = 0; i < textInput.length - cp; i++) ws.send({ type: "key_press", key: "backspace" });
+    if (nv.slice(cp)) ws.send({ type: "text", text: nv.slice(cp) });
+    setTextInput(nv);
   };
-
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && textInput === "") {
-      ws.send({ type: "key_press", key: "backspace" });
-    } else if (e.key === "Enter") {
-      ws.send({ type: "key_press", key: "enter" });
-      setTextInput("");
-    }
+    if (e.key === "Backspace" && textInput === "") ws.send({ type: "key_press", key: "backspace" });
+    else if (e.key === "Enter") { ws.send({ type: "key_press", key: "enter" }); setTextInput(""); }
   };
 
-  /* ── The stream image element (shared between full + PiP) ── */
+  /* ── Stream content ──────────────────────────────────────── */
   const streamContent = (
     <div
       className="screen-zoom-wrapper"
@@ -373,14 +319,14 @@ export default function ScreenPanel() {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={hideCursor}
     >
       {frameSrc ? (
         <div
+          ref={transformableRef}
           className="screen-img-transformable"
-          style={{
-            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`,
-            transformOrigin: "0 0",
-          }}
+          style={{ transform: "translate(0px,0px) scale(1)", transformOrigin: "0 0" }}
         >
           <img
             ref={imageRef}
@@ -392,165 +338,135 @@ export default function ScreenPanel() {
         </div>
       ) : (
         <div className="screen-placeholder">
-          <span className="screen-loader">📺</span>
+          <Monitor size={48} strokeWidth={1.5} className="screen-loader-icon" />
           <span className="screen-loading-text">Connecting to Live Feed…</span>
         </div>
       )}
 
-      {/* Zoom badge */}
-      {zoom > 1.05 && (
-        <div className="zoom-badge">{zoom.toFixed(1)}×</div>
-      )}
+      {/* Zoom badge — mutated directly by applyDOM */}
+      <div ref={badgeRef} className="zoom-badge" style={{ display: "none" }} />
+
+      {/* Cursor overlay — mutated directly by moveCursor/hideCursor */}
+      <div ref={cursorRef} className="screen-cursor" style={{ display: "none" }} />
     </div>
   );
 
   /* ════════════════════════════════════════════════════════ */
   return (
     <div className="screen-stream-panel">
-      {/* Monitor picker (shown only when > 1 monitor) */}
+      {/* Monitor picker */}
       {monitors.length > 1 && (
         <div className="monitor-picker">
           {monitors.map((m) => (
-            <button
-              key={m.index}
-              className={`monitor-chip ${activeMonitor === m.index ? "active" : ""}`}
-              onClick={() => switchMonitor(m.index)}
-              id={`monitor-chip-${m.index}`}
-            >
-              🖥️ {m.name || `Display ${m.index + 1}`}
+            <button key={m.index} className={`monitor-chip ${activeMonitor === m.index ? "active" : ""}`}
+              onClick={() => switchMonitor(m.index)} id={`monitor-chip-${m.index}`}>
+              <Monitor size={14} />
+              {m.name || `Display ${m.index + 1}`}
               {m.is_primary && <span className="monitor-primary-badge">●</span>}
             </button>
           ))}
         </div>
       )}
 
-      {/* Quick Keyboard input row */}
+      {/* Quick Keyboard */}
       {showKeyboard && (
         <div className="screen-keyboard-row">
-          <input
-            ref={inputRef}
-            className="screen-keyboard-input"
-            type="text"
-            placeholder="Quick type onto PC…"
-            value={textInput}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyDown}
-          />
-          <button className="screen-keyboard-clear" onClick={() => setTextInput("")}>
-            ✕
-          </button>
+          <input ref={inputRef} className="screen-keyboard-input" type="text"
+            placeholder="Quick type onto PC…" value={textInput}
+            onChange={handleInputChange} onKeyDown={handleKeyDown} />
+          <button className="screen-keyboard-clear" onClick={() => setTextInput("")}>✕</button>
         </div>
       )}
 
-      {/* Screen canvas / full view */}
-      {!pip && (
-        <div className="screen-canvas-wrapper" ref={wrapperRef}>
-          {streamContent}
-        </div>
-      )}
+      {/* Screen canvas */}
+      {!pip && <div className="screen-canvas-wrapper" ref={wrapperRef}>{streamContent}</div>}
 
-      {/* PiP floating overlay */}
+      {/* PiP */}
       {pip && (
-        <div
-          className="pip-overlay"
-          style={{ right: pipPos.x, top: pipPos.y }}
-        >
-          <div
-            className="pip-drag-handle"
+        <div className="pip-overlay" style={{ right: pipPos.x, top: pipPos.y }}>
+          <div className="pip-drag-handle"
             onTouchStart={handlePipTouchStart}
             onTouchMove={handlePipTouchMove}
-            onTouchEnd={handlePipTouchEnd}
-          >
+            onTouchEnd={handlePipTouchEnd}>
             <span className="pip-handle-dots">⋮⋮</span>
             <span className="pip-label">PiP</span>
-            <button
-              className="pip-expand-btn"
-              onClick={() => setPip(false)}
-              title="Expand"
-            >
-              ⛶
-            </button>
+            <button className="pip-expand-btn" onClick={() => setPip(false)} title="Expand">⛶</button>
           </div>
           {streamContent}
         </div>
       )}
 
-      {/* Bottom Floating Control Bar */}
+      {/* ── Mouse Buttons ── */}
+      <div className="mouse-buttons screen-mouse-buttons">
+        <button id="screen-btn-left-click"
+          className={`mouse-btn ${clickMode === "left" ? "active-click-mode" : ""}`}
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
+          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
+          onMouseLeave={() => ws.send({ type: "mouse_up", button: "left" })}
+          onClick={() => setClickMode("left")}>
+          <MousePointerClick size={16} /> Left
+        </button>
+        <button id="screen-btn-middle-click" className="mouse-btn mouse-btn-middle"
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+          onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
+          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+          onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
+          onMouseLeave={() => ws.send({ type: "mouse_up", button: "middle" })}>
+          <Disc size={16} />
+        </button>
+        <button id="screen-btn-right-click"
+          className={`mouse-btn ${clickMode === "right" ? "active-click-mode" : ""}`}
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
+          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
+          onMouseLeave={() => ws.send({ type: "mouse_up", button: "right" })}
+          onClick={() => setClickMode("right")}>
+          Right <MousePointerClick size={16} style={{ transform: "scaleX(-1)" }} />
+        </button>
+      </div>
+
+      {/* Scroll buttons */}
+      <div className="scroll-controls">
+        <button id="screen-btn-scroll-up" className="scroll-btn"
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: 3 }); }}>
+          <ChevronUp size={16} /> Scroll Up
+        </button>
+        <button id="screen-btn-scroll-down" className="scroll-btn"
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: -3 }); }}>
+          <ChevronDown size={16} /> Scroll Down
+        </button>
+      </div>
+
+      {/* Floating Toolbar */}
       <div className="screen-floating-toolbar">
-        {/* Click mode */}
-        <button
-          className={`toolbar-action-btn ${clickMode === "left" ? "active" : ""}`}
-          onClick={() => setClickMode("left")}
-          id="btn-click-left"
-          title="Left Click"
-        >
-          🖱️L
+        <button className={`toolbar-action-btn ${clickMode === "double" ? "active" : ""}`}
+          onClick={() => setClickMode("double")} id="btn-click-double" title="Double Click">2×</button>
+
+        <div className="toolbar-divider" />
+
+        <button className="toolbar-action-btn" onClick={() => zoomStep(-ZOOM_STEP)} id="btn-zoom-out" title="Zoom out">
+          <ZoomOut size={18} />
         </button>
-        <button
-          className={`toolbar-action-btn ${clickMode === "right" ? "active" : ""}`}
-          onClick={() => setClickMode("right")}
-          id="btn-click-right"
-          title="Right Click"
-        >
-          🖱️R
+        <button className={`toolbar-action-btn zoom-reset ${transformRef.current.z !== 1 ? "active" : ""}`}
+          onClick={zoomReset} id="btn-zoom-reset" title="Reset zoom">
+          <RotateCcw size={16} />
         </button>
-        <button
-          className={`toolbar-action-btn ${clickMode === "double" ? "active" : ""}`}
-          onClick={() => setClickMode("double")}
-          id="btn-click-double"
-          title="Double Click"
-        >
-          🖱️2×
+        <button className="toolbar-action-btn" onClick={() => zoomStep(ZOOM_STEP)} id="btn-zoom-in" title="Zoom in">
+          <ZoomIn size={18} />
         </button>
 
         <div className="toolbar-divider" />
 
-        {/* Zoom controls */}
-        <button
-          className="toolbar-action-btn"
-          onClick={zoomOut}
-          id="btn-zoom-out"
-          title="Zoom out"
-        >
-          −
+        <button className={`toolbar-action-btn kb-toggle ${showKeyboard ? "active" : ""}`}
+          onClick={toggleKeyboard} id="btn-screen-kb" title="Quick keyboard">
+          <KeyboardIcon size={18} />
         </button>
-        <button
-          className={`toolbar-action-btn zoom-reset ${zoom !== 1 ? "active" : ""}`}
-          onClick={zoomReset}
-          id="btn-zoom-reset"
-          title="Reset zoom"
-        >
-          ⊙
-        </button>
-        <button
-          className="toolbar-action-btn"
-          onClick={zoomIn}
-          id="btn-zoom-in"
-          title="Zoom in"
-        >
-          +
-        </button>
-
-        <div className="toolbar-divider" />
-
-        {/* Keyboard toggle */}
-        <button
-          className={`toolbar-action-btn kb-toggle ${showKeyboard ? "active" : ""}`}
-          onClick={toggleKeyboard}
-          id="btn-screen-kb"
-          title="Quick keyboard"
-        >
-          ⌨️
-        </button>
-
-        {/* PiP toggle */}
-        <button
-          className={`toolbar-action-btn pip-toggle ${pip ? "active" : ""}`}
-          onClick={() => setPip((v) => !v)}
-          id="btn-pip"
-          title="Picture-in-Picture"
-        >
-          ⧉
+        <button className={`toolbar-action-btn pip-toggle ${pip ? "active" : ""}`}
+          onClick={() => setPip(v => !v)} id="btn-pip" title="Picture-in-Picture">
+          <PictureInPicture size={18} />
         </button>
       </div>
     </div>
