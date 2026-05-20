@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { ws } from "../ws";
 
 const SHORTCUTS = [
@@ -38,11 +38,109 @@ const SPECIAL_KEYS = [
 
 export default function KeyboardPanel() {
   const [textInput, setTextInput] = useState("");
-  const [activeTab, setActiveTab] = useState<"shortcuts" | "special">("shortcuts");
+  const [activeTab, setActiveTab] = useState<"shortcuts" | "special" | "clipboard">("shortcuts");
+  const [clipText, setClipText] = useState("");
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showToast = (msg: string) => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToastMessage(msg);
+    toastTimeoutRef.current = setTimeout(() => {
+      setToastMessage(null);
+    }, 2500);
+  };
+
+  useEffect(() => {
+    const removeHandler = ws.addMessageHandler((msg: any) => {
+      if (msg.type === "clipboard_text") {
+        setClipText(msg.text || "");
+        showToast("📥 Retrieved PC clipboard!");
+      }
+    });
+    return () => {
+      removeHandler();
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const sendKey = (key: string) => {
     ws.send({ type: "key_press", key });
+  };
+
+  const handleSetClipboard = () => {
+    ws.send({ type: "set_clipboard", text: clipText });
+    showToast("📤 Sent to PC clipboard!");
+  };
+
+  const handleGetClipboard = () => {
+    ws.send({ type: "get_clipboard" });
+  };
+
+  const copyToPhoneClipboard = (text: string) => {
+    if (!text) {
+      showToast("⚠️ Text box is empty!");
+      return;
+    }
+
+    const performFallback = () => {
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.top = "0";
+        textArea.style.left = "0";
+        textArea.style.opacity = "0";
+        textArea.style.pointerEvents = "none";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+        if (successful) {
+          showToast("📋 Copied to phone! (Fallback)");
+        } else {
+          showToast("⚠️ Copy failed. Select text to copy manually.");
+        }
+      } catch (err) {
+        console.error("Fallback copy failed: ", err);
+        showToast("⚠️ Copy failed. Please select text to copy.");
+      }
+    };
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text)
+        .then(() => {
+          showToast("📋 Copied to phone clipboard!");
+        })
+        .catch((err) => {
+          console.warn("Clipboard API write failed, trying fallback: ", err);
+          performFallback();
+        });
+    } else {
+      performFallback();
+    }
+  };
+
+  const pasteFromPhoneClipboard = () => {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.readText()
+        .then((text) => {
+          setClipText(text);
+          showToast("📝 Pasted phone clipboard!");
+        })
+        .catch((err) => {
+          console.warn("Clipboard API read failed: ", err);
+          showToast("⚠️ Access denied. Paste manually into the box.");
+        });
+    } else {
+      showToast("⚠️ HTTP Blocked! Long-press box to paste.");
+    }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -129,6 +227,13 @@ export default function KeyboardPanel() {
         >
           Special Keys
         </button>
+        <button
+          id="tab-clipboard"
+          className={`kb-tab ${activeTab === "clipboard" ? "active" : ""}`}
+          onClick={() => setActiveTab("clipboard")}
+        >
+          Clipboard
+        </button>
       </div>
 
       {/* Shortcuts Grid */}
@@ -164,6 +269,70 @@ export default function KeyboardPanel() {
               {k.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Clipboard Sync Tab */}
+      {activeTab === "clipboard" && (
+        <div className="clipboard-sync-panel">
+          <div className="clipboard-card">
+            <div className="clipboard-header">
+              <span className="clipboard-art">📋</span>
+              <div className="clipboard-title-group">
+                <span className="clipboard-title">Cross-Origin Clipboard Sync</span>
+                <span className="clipboard-subtitle">Sync clipboard contents securely via WebSocket</span>
+              </div>
+            </div>
+
+            <textarea
+              className="clipboard-textarea"
+              placeholder="Paste text here to send to PC, or tap 'Get PC Clipboard' to fetch..."
+              value={clipText}
+              onChange={(e) => setClipText(e.target.value)}
+            />
+
+            <div className="clipboard-actions">
+              <button
+                id="btn-get-pc-clipboard"
+                className="clipboard-action-btn receive"
+                onClick={handleGetClipboard}
+                title="Fetch PC clipboard"
+              >
+                📥 Get from PC
+              </button>
+              <button
+                id="btn-set-pc-clipboard"
+                className="clipboard-action-btn send"
+                onClick={handleSetClipboard}
+                disabled={!clipText.trim()}
+                title="Send text to PC clipboard"
+              >
+                📤 Send to PC
+              </button>
+              <button
+                id="btn-copy-local-clipboard"
+                className="clipboard-action-btn local-copy"
+                onClick={() => copyToPhoneClipboard(clipText)}
+                title="Copy text to phone system clipboard"
+              >
+                📋 Copy to Phone
+              </button>
+              <button
+                id="btn-paste-local-clipboard"
+                className="clipboard-action-btn local-paste"
+                onClick={pasteFromPhoneClipboard}
+                title="Paste text from phone system clipboard"
+              >
+                📝 Paste from Phone
+              </button>
+            </div>
+          </div>
+
+          {toastMessage && (
+            <div className="clipboard-toast">
+              {toastMessage}
+            </div>
+          )}
         </div>
       )}
     </div>

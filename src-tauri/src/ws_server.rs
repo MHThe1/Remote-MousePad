@@ -102,6 +102,25 @@ fn process_message(
             focus_window(*id);
             return None;
         }
+        RemoteCommand::SetClipboard { text } => {
+            if let Ok(mut cb) = arboard::Clipboard::new() {
+                let _ = cb.set_text(text.clone());
+            }
+            return None;
+        }
+        RemoteCommand::GetClipboard => {
+            let mut content = String::new();
+            if let Ok(mut cb) = arboard::Clipboard::new() {
+                if let Ok(text) = cb.get_text() {
+                    content = text;
+                }
+            }
+            let resp = json!({
+                "type": "clipboard_text",
+                "text": content
+            });
+            return Some(resp.to_string());
+        }
         _ => {}
     }
 

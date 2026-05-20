@@ -17,6 +17,8 @@ pub enum RemoteCommand {
     Power { action: PowerAction },
     GetWindows,
     FocusWindow { id: u64 },
+    SetClipboard { text: String },
+    GetClipboard,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -94,7 +96,10 @@ impl InputHandler {
             RemoteCommand::Power { ref action } => {
                 handle_power(action)?;
             }
-            RemoteCommand::GetWindows | RemoteCommand::FocusWindow { .. } => {
+            RemoteCommand::GetWindows
+            | RemoteCommand::FocusWindow { .. }
+            | RemoteCommand::SetClipboard { .. }
+            | RemoteCommand::GetClipboard => {
                 // handled in ws_server
             }
         }
