@@ -22,11 +22,50 @@ pub struct ServerInfo {
     pub connected_clients: usize,
 }
 
+fn get_lan_ip() -> String {
+    // 1. Try local_ip() first (most accurate if internet/default gateway is connected)
+    if let Ok(ip) = local_ip() {
+        let ip_str = ip.to_string();
+        if ip_str != "127.0.0.1" {
+            return ip_str;
+        }
+    }
+
+    // 2. If it fails or returns loopback, iterate through all interfaces
+    if let Ok(interfaces) = local_ip_address::list_afinet_netifas() {
+        let mut candidates = Vec::new();
+        for (name, ip) in interfaces {
+            if ip.is_ipv4() {
+                let ip_str = ip.to_string();
+                if ip_str.starts_with("127.") {
+                    continue;
+                }
+                let lower_name = name.to_lowercase();
+                let is_virtual = lower_name.contains("virtual")
+                    || lower_name.contains("wsl")
+                    || lower_name.contains("vbox")
+                    || lower_name.contains("docker")
+                    || lower_name.contains("vethernet")
+                    || lower_name.contains("loopback");
+
+                candidates.push((is_virtual, ip_str));
+            }
+        }
+
+        // Sort so that non-virtual interfaces are preferred
+        candidates.sort_by_key(|(is_virtual, _)| *is_virtual);
+
+        if let Some((_, ip_str)) = candidates.first() {
+            return ip_str.clone();
+        }
+    }
+
+    "127.0.0.1".to_string()
+}
+
 #[tauri::command]
 fn get_server_info(clients: tauri::State<ConnectedClients>) -> ServerInfo {
-    let lan_ip = local_ip()
-        .map(|ip| ip.to_string())
-        .unwrap_or_else(|_| "127.0.0.1".to_string());
+    let lan_ip = get_lan_ip();
     let count = *clients.lock().unwrap();
     ServerInfo {
         lan_ip,

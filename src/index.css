@@ -140,6 +140,10 @@ body {
   overflow-y: auto;
 }
 
+.content > div {
+  flex-shrink: 0;
+}
+
 /* ─── QR Card ────────────────────────────────────────────── */
 .qr-card {
   background: var(--bg-card);
@@ -153,6 +157,7 @@ body {
   transition: border-color 0.3s;
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .qr-card::before {
@@ -180,6 +185,11 @@ body {
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 8px 32px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
+  width: 184px;
+  height: 184px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .qr-url {
@@ -204,6 +214,7 @@ body {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .info-card {

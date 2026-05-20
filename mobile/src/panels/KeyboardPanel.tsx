@@ -42,7 +42,7 @@ export default function KeyboardPanel() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const sendKey = (key: string) => {
-    ws.send({ type: "key", key });
+    ws.send({ type: "key_press", key });
   };
 
   const sendText = () => {

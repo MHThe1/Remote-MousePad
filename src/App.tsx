@@ -32,10 +32,6 @@ export default function App() {
     ? `http://${info.lan_ip}:${info.http_port}`
     : "Loading...";
 
-  const wsUrl = info
-    ? `ws://${info.lan_ip}:${info.ws_port}`
-    : "";
-
   return (
     <div className="app">
       <header className="header">
@@ -55,7 +51,12 @@ export default function App() {
           <span className="qr-label">Scan to Connect</span>
           <div className="qr-wrapper">
             {info ? (
-              <QRCode value={mobileUrl} size={160} />
+              <QRCode
+                value={mobileUrl}
+                size={160}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox="0 0 160 160"
+              />
             ) : (
               <div style={{ width: 160, height: 160, background: "#f0f0f0", borderRadius: 8 }} />
             )}
