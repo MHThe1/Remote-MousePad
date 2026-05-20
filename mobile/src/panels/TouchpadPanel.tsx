@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ws } from "../ws";
 import { Keyboard, Hand, MousePointerClick, ChevronUp, ChevronDown, Disc } from "lucide-react";
+import { hapticTap, hapticRightClick, hapticDouble, hapticScroll } from "../haptics";
 export default function TouchpadPanel() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [textInput, setTextInput] = useState("");
@@ -137,6 +138,7 @@ export default function TouchpadPanel() {
       const dx = Math.abs(lastTouch.current.x - touchStartPos.current.x);
       const dy = Math.abs(lastTouch.current.y - touchStartPos.current.y);
       if (dx < TAP_MAX_MOVE && dy < TAP_MAX_MOVE) {
+        hapticTap();
         ws.send({ type: "mouse_click", button: "left" });
       }
     }
@@ -199,9 +201,9 @@ export default function TouchpadPanel() {
         <button
           id="btn-left-click"
           className="mouse-btn"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "left" }); }}
           onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
-          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onMouseDown={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "left" }); }}
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "left" })}
         >
@@ -211,9 +213,9 @@ export default function TouchpadPanel() {
         <button
           id="btn-middle-click"
           className="mouse-btn mouse-btn-middle"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "middle" }); }}
           onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
-          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+          onMouseDown={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "middle" }); }}
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "middle" })}
         >
@@ -222,9 +224,9 @@ export default function TouchpadPanel() {
         <button
           id="btn-right-click"
           className="mouse-btn"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticRightClick(); ws.send({ type: "mouse_down", button: "right" }); }}
           onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
-          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onMouseDown={(e) => { e.preventDefault(); hapticRightClick(); ws.send({ type: "mouse_down", button: "right" }); }}
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "right" })}
         >
@@ -237,14 +239,14 @@ export default function TouchpadPanel() {
         <button
           id="btn-scroll-up"
           className="scroll-btn"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: 3 }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticScroll(); ws.send({ type: "scroll", dx: 0, dy: 3 }); }}
         >
           <ChevronUp size={16} /> Scroll Up
         </button>
         <button
           id="btn-scroll-down"
           className="scroll-btn"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: -3 }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticScroll(); ws.send({ type: "scroll", dx: 0, dy: -3 }); }}
         >
           <ChevronDown size={16} /> Scroll Down
         </button>

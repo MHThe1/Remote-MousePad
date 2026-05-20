@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ws } from "../ws";
 import { Copy, ClipboardPaste, Scissors, Undo, Redo, SquareAsterisk, Save, Search, Plus, X, Maximize, Settings, ClipboardCopy, Download, Upload } from "lucide-react";
+import { hapticTap, hapticMedium, hapticClipboard, hapticSuccess } from "../haptics";
 
 const SHORTCUTS = [
   { id: "sc-copy", label: "Copy", key: "ctrl+c", icon: <Copy size={24} /> },
@@ -59,6 +60,7 @@ export default function KeyboardPanel() {
     const removeHandler = ws.addMessageHandler((msg: any) => {
       if (msg.type === "clipboard_text") {
         setClipText(msg.text || "");
+        hapticSuccess();
         showToast("📥 Retrieved PC clipboard!");
       }
     });
@@ -71,15 +73,19 @@ export default function KeyboardPanel() {
   }, []);
 
   const sendKey = (key: string) => {
+    // Combos (ctrl+, alt+, shift+) get a slightly heavier haptic
+    if (key.includes("+")) hapticMedium(); else hapticTap();
     ws.send({ type: "key_press", key });
   };
 
   const handleSetClipboard = () => {
+    hapticClipboard();
     ws.send({ type: "set_clipboard", text: clipText });
     showToast("📤 Sent to PC clipboard!");
   };
 
   const handleGetClipboard = () => {
+    hapticClipboard();
     ws.send({ type: "get_clipboard" });
   };
 

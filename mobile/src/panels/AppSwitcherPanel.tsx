@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ws } from "../ws";
 import { Loader2, RefreshCw, Monitor, ChevronRight, Globe, Code, Folder, FileText, Terminal, Music, MessageCircle, Users, Briefcase, Video } from "lucide-react";
+import { hapticAppSwitch, hapticTap } from "../haptics";
 
 interface WindowInfo {
   id: number;
@@ -32,6 +33,7 @@ export default function AppSwitcherPanel() {
   }, []);
 
   const focusWindow = (id: number) => {
+    hapticAppSwitch();
     ws.send({ type: "focus_window", id });
   };
 
@@ -73,7 +75,7 @@ export default function AppSwitcherPanel() {
         <button
           id="btn-refresh-windows"
           className="refresh-btn"
-          onClick={fetchWindows}
+          onClick={() => { hapticTap(); fetchWindows(); }}
           disabled={loading}
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}

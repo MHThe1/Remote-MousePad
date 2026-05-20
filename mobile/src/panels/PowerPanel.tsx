@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ws } from "../ws";
 import { Lock, Moon, RotateCw, Power } from "lucide-react";
+import { hapticPower, hapticWarning, hapticDanger } from "../haptics";
 
 interface PowerAction {
   id: string;
@@ -49,14 +50,17 @@ export default function PowerPanel() {
 
   const handleTap = (action: PowerAction) => {
     if (action.danger) {
+      hapticWarning();
       setConfirm(action);
     } else {
+      hapticPower();
       ws.send({ type: "power", action: action.action });
     }
   };
 
   const confirmAction = () => {
     if (confirm) {
+      hapticDanger();
       ws.send({ type: "power", action: confirm.action });
       setConfirm(null);
     }

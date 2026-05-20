@@ -5,6 +5,10 @@ import {
   ZoomIn, ZoomOut, RotateCcw, Keyboard as KeyboardIcon, PictureInPicture,
   MousePointerClick, Hand, Minus, Plus
 } from "lucide-react";
+import {
+  hapticTap, hapticRightClick, hapticDouble, hapticModeChange,
+  hapticScroll, hapticMedium
+} from "../haptics";
 
 /* ── Types ──────────────────────────────────────────────────── */
 interface PCDimensions { width: number; height: number; }
@@ -180,6 +184,7 @@ export default function ScreenPanel() {
 
   /* ── Click mode — separate from the trigger buttons ─────── */
   const selectMode = useCallback((mode: ClickMode) => {
+    hapticModeChange();
     setClickMode(mode);
   }, []);
 
@@ -189,11 +194,13 @@ export default function ScreenPanel() {
     if (!pc) return;
     ws.send({ type: "mouse_move_abs", x: pc.x, y: pc.y });
     if (clickMode === "left") {
+      hapticTap();
       ws.send({ type: "mouse_click", button: "left" });
     } else if (clickMode === "right") {
+      hapticRightClick();
       ws.send({ type: "mouse_click", button: "right" });
     } else {
-      // double
+      hapticDouble();
       ws.send({ type: "mouse_click", button: "left" });
       setTimeout(() => ws.send({ type: "mouse_click", button: "left" }), 80);
     }
@@ -509,9 +516,9 @@ export default function ScreenPanel() {
         <button
           id="screen-btn-left-trigger"
           className={`trigger-btn trigger-left ${clickMode === "left" ? "mode-active" : ""}`}
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "left" }); }}
           onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
-          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onMouseDown={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "left" }); }}
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "left" })}
         >
@@ -523,9 +530,9 @@ export default function ScreenPanel() {
           <button
             id="screen-btn-middle-trigger"
             className="trigger-btn trigger-middle"
-            onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+            onTouchStart={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "middle" }); }}
             onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
-            onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+            onMouseDown={(e) => { e.preventDefault(); hapticTap(); ws.send({ type: "mouse_down", button: "middle" }); }}
             onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
             onMouseLeave={() => ws.send({ type: "mouse_up", button: "middle" })}
           >
@@ -533,11 +540,11 @@ export default function ScreenPanel() {
           </button>
           <div className="trigger-scroll-btns">
             <button id="screen-btn-scroll-up" className="scroll-mini-btn"
-              onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: 3 }); }}>
+              onTouchStart={(e) => { e.preventDefault(); hapticScroll(); ws.send({ type: "scroll", dx: 0, dy: 3 }); }}>
               <ChevronUp size={14} />
             </button>
             <button id="screen-btn-scroll-down" className="scroll-mini-btn"
-              onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: -3 }); }}>
+              onTouchStart={(e) => { e.preventDefault(); hapticScroll(); ws.send({ type: "scroll", dx: 0, dy: -3 }); }}>
               <ChevronDown size={14} />
             </button>
           </div>
@@ -546,9 +553,9 @@ export default function ScreenPanel() {
         <button
           id="screen-btn-right-trigger"
           className={`trigger-btn trigger-right ${clickMode === "right" ? "mode-active" : ""}`}
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onTouchStart={(e) => { e.preventDefault(); hapticRightClick(); ws.send({ type: "mouse_down", button: "right" }); }}
           onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
-          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onMouseDown={(e) => { e.preventDefault(); hapticRightClick(); ws.send({ type: "mouse_down", button: "right" }); }}
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "right" })}
         >

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ws } from "../ws";
 import { Music, SkipBack, Play, SkipForward, Volume1, VolumeX, Volume2 } from "lucide-react";
+import { hapticMedia, hapticSkip, hapticVolume, hapticMedium } from "../haptics";
 
 interface MediaButtonProps {
   id: string;
@@ -17,6 +18,11 @@ function MediaButton({ id, icon, label, action, large, className }: MediaButtonP
   const trigger = (e: React.TouchEvent | React.MouseEvent) => {
     e.preventDefault();
     setPressed(true);
+    // Pick haptic based on action type
+    if (action === "play_pause") hapticMedia();
+    else if (action === "prev" || action === "next") hapticSkip();
+    else if (action === "mute") hapticMedium();
+    else hapticVolume(); // vol_up / vol_down
     ws.send({ type: "media", action });
     setTimeout(() => setPressed(false), 150);
   };

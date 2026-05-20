@@ -7,6 +7,7 @@ import MediaPanel from "./panels/MediaPanel";
 import PowerPanel from "./panels/PowerPanel";
 import AppSwitcherPanel from "./panels/AppSwitcherPanel";
 import { MousePointer2, Monitor, Keyboard, Music, Power, LayoutGrid, Mouse } from "lucide-react";
+import { hapticTabChange, hapticSuccess, hapticError, hapticTest, hapticSupported, canVibrate, isIOS, getHapticAudio, setHapticAudio } from "./haptics";
 import "./index.css";
 
 type Panel = "touchpad" | "screen" | "keyboard" | "media" | "power" | "apps";
@@ -24,6 +25,7 @@ export default function App() {
   const [panel, setPanel] = useState<Panel>("touchpad");
   const [connected, setConnected] = useState(false);
   const [showConnect, setShowConnect] = useState(true);
+  const [audioHaptic, setAudioHaptic] = useState(getHapticAudio);
   const [wsUrl, setWsUrl] = useState(() => {
     // Auto-detect: the WS server is on same host, port 9001
     const host = window.location.hostname;
@@ -31,12 +33,16 @@ export default function App() {
   });
 
   useEffect(() => {
-    ws.setStatusChangeHandler((c) => setConnected(c));
+    ws.setStatusChangeHandler((c) => {
+      setConnected(c);
+      if (c) hapticSuccess(); else hapticError();
+    });
     ws.connect(wsUrl);
     return () => ws.disconnect();
   }, []);
 
   const handleConnect = (url: string) => {
+    hapticTest(); // prime Vibration API on first real user gesture
     setWsUrl(url);
     ws.disconnect();
     ws.connect(url);
@@ -64,6 +70,28 @@ export default function App() {
           <span className="conn-dot"></span>
           {connected ? "Connected" : "Reconnecting..."}
         </div>
+        {/* Haptic / Audio indicator — tap to toggle on iOS, test on Android */}
+        <button
+          id="btn-haptic-test"
+          className={`haptic-indicator ${isIOS && !audioHaptic ? "haptic-muted" : ""}`}
+          title={
+            canVibrate ? "Tap to test vibration" :
+            isIOS ? (audioHaptic ? "Tap sounds ON — tap to mute" : "Tap sounds OFF — tap to enable") :
+            "No haptic support"
+          }
+          onClick={() => {
+            if (isIOS) {
+              const next = !audioHaptic;
+              setHapticAudio(next);
+              setAudioHaptic(next);
+              if (next) hapticTest();
+            } else {
+              hapticTest();
+            }
+          }}
+        >
+          {canVibrate ? "📳" : isIOS ? (audioHaptic ? "🔊" : "🔕") : ""}
+        </button>
       </header>
 
       {/* Panel */}
@@ -83,7 +111,7 @@ export default function App() {
             key={t.id}
             id={`tab-${t.id}`}
             className={`tab-btn ${panel === t.id ? "active" : ""}`}
-            onClick={() => setPanel(t.id)}
+            onClick={() => { hapticTabChange(); setPanel(t.id); }}
           >
             <div className="tab-icon-wrapper">
               <span className="tab-icon">{t.icon}</span>
@@ -130,14 +158,14 @@ function ConnectScreen({
         <button
           id="btn-connect"
           className="connect-btn"
-          onClick={() => onConnect(url)}
+          onClick={() => { hapticTest(); onConnect(url); }}
         >
           Connect
         </button>
         <button
           id="btn-skip-connect"
           className="connect-skip"
-          onClick={onSkip}
+          onClick={() => { hapticTest(); onSkip(); }}
         >
           Auto-detect (same network)
         </button>

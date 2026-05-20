@@ -118,6 +118,31 @@ body {
   color: var(--md-sys-color-error);
 }
 
+/* Haptic feedback indicator in header */
+.haptic-indicator {
+  background: none;
+  border: none;
+  font-size: 18px;
+  padding: 4px 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.85;
+  transition: opacity 0.2s, transform 0.15s;
+  line-height: 1;
+  touch-action: manipulation;
+  flex-shrink: 0;
+}
+
+.haptic-indicator:active {
+  transform: scale(0.85);
+  opacity: 1;
+}
+
+.haptic-indicator.haptic-muted {
+  opacity: 0.35;
+}
+
+
 .conn-dot {
   width: 7px;
   height: 7px;
