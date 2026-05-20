@@ -6,8 +6,8 @@ import KeyboardPanel from "./panels/KeyboardPanel";
 import MediaPanel from "./panels/MediaPanel";
 import PowerPanel from "./panels/PowerPanel";
 import AppSwitcherPanel from "./panels/AppSwitcherPanel";
-import { MousePointer2, Monitor, Keyboard, Music, Power, LayoutGrid, Mouse } from "lucide-react";
-import { hapticTabChange, hapticSuccess, hapticError, hapticTest, hapticSupported, canVibrate, isIOS, getHapticAudio, setHapticAudio } from "./haptics";
+import { MousePointer2, Monitor, Keyboard, Music, Power, LayoutGrid, Mouse, Volume2, VolumeOff, Vibrate } from "lucide-react";
+import { hapticTabChange, hapticSuccess, hapticError, hapticTest, canVibrate, isIOS, getHapticAudio, setHapticAudio } from "./haptics";
 import "./index.css";
 
 type Panel = "touchpad" | "screen" | "keyboard" | "media" | "power" | "apps";
@@ -63,7 +63,7 @@ export default function App() {
       {/* Header */}
       <header className="mobile-header">
         <div className="mobile-logo">
-          <Mouse size={24} strokeWidth={2.5} className="logo-icon" /> 
+          <Mouse size={24} strokeWidth={2.5} className="logo-icon" />
           MouseRemote
         </div>
         <div className={`conn-badge ${connected ? "conn" : "disconn"}`}>
@@ -76,8 +76,8 @@ export default function App() {
           className={`haptic-indicator ${isIOS && !audioHaptic ? "haptic-muted" : ""}`}
           title={
             canVibrate ? "Tap to test vibration" :
-            isIOS ? (audioHaptic ? "Tap sounds ON — tap to mute" : "Tap sounds OFF — tap to enable") :
-            "No haptic support"
+              isIOS ? (audioHaptic ? "Tap sounds ON — tap to mute" : "Tap sounds OFF — tap to enable") :
+                "No haptic support"
           }
           onClick={() => {
             if (isIOS) {
@@ -90,7 +90,7 @@ export default function App() {
             }
           }}
         >
-          {canVibrate ? "📳" : isIOS ? (audioHaptic ? "🔊" : "🔕") : ""}
+          {canVibrate ? <Vibrate size={20} /> : isIOS ? (audioHaptic ? <Volume2 size={20} /> : <VolumeOff size={20} />) : ""}
         </button>
       </header>
 

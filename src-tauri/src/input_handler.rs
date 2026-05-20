@@ -138,7 +138,11 @@ fn handle_key_press(
 
     // Press + release main key
     if let Some(k) = str_to_key(main_key) {
-        enigo.key(k, Direction::Click)?;
+        if matches!(k, Key::Unicode(_)) && modifiers.is_empty() {
+            enigo.text(main_key)?;
+        } else {
+            enigo.key(k, Direction::Click)?;
+        }
     }
 
     // Release modifiers in reverse

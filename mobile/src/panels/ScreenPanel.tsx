@@ -2,12 +2,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { ws } from "../ws";
 import {
   Monitor, Disc, ChevronUp, ChevronDown,
-  ZoomIn, ZoomOut, RotateCcw, Keyboard as KeyboardIcon, PictureInPicture,
-  MousePointerClick, Hand, Minus, Plus
+  RotateCcw, Keyboard as KeyboardIcon, PictureInPicture,
+  MousePointerClick, Minus, Plus
 } from "lucide-react";
 import {
   hapticTap, hapticRightClick, hapticDouble, hapticModeChange,
-  hapticScroll, hapticMedium
+  hapticScroll
 } from "../haptics";
 
 /* ── Types ──────────────────────────────────────────────────── */
@@ -28,6 +28,7 @@ function mid(a: React.Touch, b: React.Touch) {
   return { x: (a.clientX + b.clientX) / 2, y: (a.clientY + b.clientY) / 2 };
 }
 
+const ZOOM_MIN = 1;
 const ZOOM_MAX = 8;
 
 /* Natural size of the image once loaded */

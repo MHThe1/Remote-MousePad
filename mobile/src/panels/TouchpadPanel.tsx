@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ws } from "../ws";
 import { Keyboard, Hand, MousePointerClick, ChevronUp, ChevronDown, Disc } from "lucide-react";
-import { hapticTap, hapticRightClick, hapticDouble, hapticScroll } from "../haptics";
+import { hapticTap, hapticRightClick, hapticScroll } from "../haptics";
 export default function TouchpadPanel() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [textInput, setTextInput] = useState("");

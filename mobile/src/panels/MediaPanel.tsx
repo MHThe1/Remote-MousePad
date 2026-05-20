@@ -31,7 +31,6 @@ function MediaButton({ id, icon, label, action, large, className }: MediaButtonP
     <button
       id={id}
       className={`media-btn ${large ? "media-btn-large" : ""} ${pressed ? "pressed" : ""} ${className ?? ""}`}
-      onTouchStart={trigger}
       onClick={trigger}
     >
       <span className="media-icon">{icon}</span>

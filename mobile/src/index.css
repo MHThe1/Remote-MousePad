@@ -934,6 +934,254 @@ body {
   flex-shrink: 0;
 }
 
+/* Window switcher sub-panel */
+.window-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ══════════════════════════════════════════════════
+   APPS PANEL SUB-TAB BAR
+══════════════════════════════════════════════════ */
+.apps-tab-bar {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+  background: var(--md-sys-color-surface-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+}
+
+.apps-tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-radius: calc(var(--radius-pill) - 4px);
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.apps-tab-btn.active {
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  box-shadow: 0 2px 8px rgba(208, 188, 255, 0.25);
+}
+
+/* ══════════════════════════════════════════════════
+   APP REMOTE CARD GRID
+══════════════════════════════════════════════════ */
+.app-remote-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.app-remote-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  background: var(--md-sys-color-surface-container);
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius);
+  padding: 16px 8px 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.18s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* App color glow on bottom edge */
+.app-remote-card::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--app-color, var(--md-sys-color-primary));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.app-remote-card:active {
+  transform: scale(0.94);
+  border-color: var(--app-color, var(--md-sys-color-primary));
+}
+
+.app-remote-card.active {
+  background: color-mix(in srgb, var(--app-color, var(--md-sys-color-primary)) 12%, transparent);
+  border-color: var(--app-color, var(--md-sys-color-primary));
+  box-shadow: 0 0 12px color-mix(in srgb, var(--app-color, var(--md-sys-color-primary)) 30%, transparent);
+}
+
+.app-remote-card.active::after { opacity: 1; }
+
+.app-remote-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+}
+
+.app-remote-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+  letter-spacing: 0.01em;
+}
+
+.app-remote-desc {
+  font-size: 10px;
+  color: var(--md-sys-color-on-surface-variant);
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* ══════════════════════════════════════════════════
+   APP REMOTE CONTROLS (the actual remote)
+══════════════════════════════════════════════════ */
+.app-remote-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slideUp 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Header bar */
+.arc-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--app-color, var(--md-sys-color-primary)) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--app-color, var(--md-sys-color-primary)) 30%, transparent);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+}
+
+.arc-back-btn {
+  background: none;
+  border: none;
+  color: var(--md-sys-color-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 50%;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.arc-back-btn:active { transform: scale(0.85); background: rgba(255,255,255,0.08); }
+
+.arc-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.arc-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--md-sys-color-on-surface);
+}
+
+.arc-desc {
+  font-size: 11px;
+  color: var(--md-sys-color-on-surface-variant);
+  margin-left: auto;
+}
+
+/* Button rows */
+.arc-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.arc-row {
+  display: flex;
+  gap: 8px;
+}
+
+/* Base remote button */
+.arc-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--md-sys-color-surface-container);
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-md);
+  color: var(--md-sys-color-on-surface-variant);
+  padding: 12px 6px;
+  min-height: 58px;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background 0.1s, transform 0.08s, border-color 0.1s;
+  position: relative;
+  overflow: hidden;
+}
+
+.arc-btn:active {
+  transform: scale(0.91);
+  background: var(--md-sys-color-surface-container-highest);
+}
+
+/* Accent (play/pause) button */
+.arc-btn-accent {
+  background: color-mix(in srgb, var(--app-color, var(--md-sys-color-primary)) 18%, var(--card));
+  border-color: var(--app-color, var(--md-sys-color-primary));
+  color: var(--app-color, var(--md-sys-color-primary));
+  box-shadow: 0 0 14px color-mix(in srgb, var(--app-color, var(--md-sys-color-primary)) 25%, transparent);
+  flex: 1.4;
+  min-height: 64px;
+}
+
+.arc-btn-wide {
+  flex: 3;
+}
+
+.arc-btn-danger {
+  border-color: var(--md-sys-color-error);
+  color: var(--md-sys-color-error);
+}
+
+.arc-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.arc-btn-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: inherit;
+  white-space: nowrap;
+}
+
+
 /* Touchpad Keyboard Integration */
 .touchpad-wrapper {
   position: relative;
