@@ -45,15 +45,49 @@ export default function KeyboardPanel() {
     ws.send({ type: "key_press", key });
   };
 
-  const sendText = () => {
-    if (textInput.trim()) {
-      ws.send({ type: "text", text: textInput });
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+
+    // Compute diff between textInput and newValue
+    let commonPrefixLen = 0;
+    while (
+      commonPrefixLen < textInput.length &&
+      commonPrefixLen < newValue.length &&
+      textInput[commonPrefixLen] === newValue[commonPrefixLen]
+    ) {
+      commonPrefixLen++;
+    }
+
+    const backspaces = textInput.length - commonPrefixLen;
+    const addedText = newValue.slice(commonPrefixLen);
+
+    // Send backspaces if any
+    for (let i = 0; i < backspaces; i++) {
+      ws.send({ type: "key_press", key: "backspace" });
+    }
+
+    // Send added text if any
+    if (addedText) {
+      ws.send({ type: "text", text: addedText });
+    }
+
+    setTextInput(newValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && textInput === "") {
+      ws.send({ type: "key_press", key: "backspace" });
+    } else if (e.key === "Enter") {
+      ws.send({ type: "key_press", key: "enter" });
       setTextInput("");
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") sendText();
+  const handleClear = () => {
+    setTextInput("");
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
   };
 
   return (
@@ -65,17 +99,17 @@ export default function KeyboardPanel() {
           id="text-input-field"
           className="text-input"
           type="text"
-          placeholder="Type here and press Send..."
+          placeholder="Type here in real-time..."
           value={textInput}
-          onChange={(e) => setTextInput(e.target.value)}
+          onChange={handleInputChange}
           onKeyDown={handleKeyDown}
         />
         <button
-          id="btn-send-text"
+          id="btn-clear-text"
           className="send-btn"
-          onClick={sendText}
+          onClick={handleClear}
         >
-          Send
+          Clear
         </button>
       </div>
 

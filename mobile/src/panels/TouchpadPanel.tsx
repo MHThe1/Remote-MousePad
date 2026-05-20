@@ -1,14 +1,75 @@
-import { useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { ws } from "../ws";
 
 
 export default function TouchpadPanel() {
+  const [showKeyboard, setShowKeyboard] = useState(false);
+  const [textInput, setTextInput] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const lastTouch = useRef<{ x: number; y: number } | null>(null);
   const touchStartTime = useRef(0);
   const touchStartPos = useRef<{ x: number; y: number } | null>(null);
   const isTwoFinger = useRef(false);
   const lastTwoFingerY = useRef<number | null>(null);
   const isDragging = useRef(false);
+
+  useEffect(() => {
+    if (showKeyboard && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [showKeyboard]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newValue = e.target.value;
+
+    // Compute diff between textInput and newValue
+    let commonPrefixLen = 0;
+    while (
+      commonPrefixLen < textInput.length &&
+      commonPrefixLen < newValue.length &&
+      textInput[commonPrefixLen] === newValue[commonPrefixLen]
+    ) {
+      commonPrefixLen++;
+    }
+
+    const backspaces = textInput.length - commonPrefixLen;
+    const addedText = newValue.slice(commonPrefixLen);
+
+    // Send backspaces if any
+    for (let i = 0; i < backspaces; i++) {
+      ws.send({ type: "key_press", key: "backspace" });
+    }
+
+    // Send added text if any
+    if (addedText) {
+      ws.send({ type: "text", text: addedText });
+    }
+
+    setTextInput(newValue);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && textInput === "") {
+      ws.send({ type: "key_press", key: "backspace" });
+    } else if (e.key === "Enter") {
+      ws.send({ type: "key_press", key: "enter" });
+      setTextInput("");
+    }
+  };
+
+  const handleClear = () => {
+    setTextInput("");
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  };
+
+  const toggleKeyboard = (e: React.TouchEvent | React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowKeyboard((prev) => !prev);
+  };
 
   const SENSITIVITY = 1.8;
   const SCROLL_SENSITIVITY = 0.4;
@@ -87,16 +148,51 @@ export default function TouchpadPanel() {
 
   return (
     <div className="touchpad-panel">
-      <div
-        className="touchpad"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-      >
-        <div className="touchpad-hint">
-          <span className="touchpad-icon">☝️</span>
-          <p>Drag to move cursor</p>
-          <p className="sub">Tap = left click · 2 fingers = scroll</p>
+      <div className="touchpad-wrapper">
+        {/* Floating Keyboard Toggle */}
+        <button
+          id="btn-touchpad-kb-toggle"
+          className={`touchpad-kb-toggle ${showKeyboard ? "active" : ""}`}
+          onTouchStart={toggleKeyboard}
+          onClick={toggleKeyboard}
+          aria-label="Toggle Virtual Keyboard"
+        >
+          ⌨️
+        </button>
+
+        {/* Sleek inline Quick Type bar */}
+        {showKeyboard && (
+          <div className="touchpad-keyboard-row">
+            <input
+              ref={inputRef}
+              type="text"
+              className="touchpad-keyboard-input"
+              placeholder="Quick type here..."
+              value={textInput}
+              onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
+            />
+            <button
+              className="touchpad-keyboard-clear"
+              onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); handleClear(); }}
+              onClick={(e) => { e.stopPropagation(); handleClear(); }}
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        <div
+          className="touchpad"
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
+          <div className="touchpad-hint">
+            <span className="touchpad-icon">☝️</span>
+            <p>Drag to move cursor</p>
+            <p className="sub">Tap = left click · 2 fingers = scroll</p>
+          </div>
         </div>
       </div>
 

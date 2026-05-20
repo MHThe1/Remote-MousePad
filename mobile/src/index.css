@@ -893,3 +893,114 @@ body {
   color: var(--muted);
   flex-shrink: 0;
 }
+
+/* Touchpad Keyboard Integration */
+.touchpad-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 260px;
+}
+
+.touchpad-kb-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(26, 26, 46, 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  touch-action: manipulation;
+}
+
+.touchpad-kb-toggle:active {
+  transform: scale(0.9);
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.touchpad-kb-toggle.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 15px var(--accent-glow);
+}
+
+.touchpad-keyboard-row {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 68px; /* Leave space for the toggle button */
+  height: 44px;
+  background: rgba(26, 26, 46, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border-accent);
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  padding: 0 6px 0 14px;
+  gap: 8px;
+  z-index: 5;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+  animation: slideInDown 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.touchpad-keyboard-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  outline: none;
+}
+
+.touchpad-keyboard-input::placeholder {
+  color: var(--muted);
+}
+
+.touchpad-keyboard-clear {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s;
+}
+
+.touchpad-keyboard-clear:active {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--text);
+}
+
