@@ -80,16 +80,16 @@ export default function TouchpadPanel() {
     e.preventDefault();
     touchStartTime.current = Date.now();
 
-    if (e.touches.length === 1) {
-      const t = e.touches[0];
+    if (e.targetTouches.length === 1) {
+      const t = e.targetTouches[0];
       lastTouch.current = { x: t.clientX, y: t.clientY };
       touchStartPos.current = { x: t.clientX, y: t.clientY };
       isTwoFinger.current = false;
       lastTwoFingerY.current = null;
-    } else if (e.touches.length === 2) {
+    } else if (e.targetTouches.length === 2) {
       isTwoFinger.current = true;
       isDragging.current = false;
-      const avgY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const avgY = (e.targetTouches[0].clientY + e.targetTouches[1].clientY) / 2;
       lastTwoFingerY.current = avgY;
     }
   }, []);
@@ -97,9 +97,9 @@ export default function TouchpadPanel() {
   const onTouchMove = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
 
-    if (e.touches.length === 2 && isTwoFinger.current) {
+    if (e.targetTouches.length === 2 && isTwoFinger.current) {
       // Two-finger scroll
-      const avgY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+      const avgY = (e.targetTouches[0].clientY + e.targetTouches[1].clientY) / 2;
       if (lastTwoFingerY.current !== null) {
         const dy = (avgY - lastTwoFingerY.current) * SCROLL_SENSITIVITY;
         const scrollAmount = Math.round(dy);
@@ -111,8 +111,8 @@ export default function TouchpadPanel() {
       return;
     }
 
-    if (e.touches.length === 1 && !isTwoFinger.current) {
-      const t = e.touches[0];
+    if (e.targetTouches.length === 1 && !isTwoFinger.current) {
+      const t = e.targetTouches[0];
       if (lastTouch.current) {
         const dx = Math.round((t.clientX - lastTouch.current.x) * SENSITIVITY);
         const dy = Math.round((t.clientY - lastTouch.current.y) * SENSITIVITY);
@@ -200,7 +200,11 @@ export default function TouchpadPanel() {
         <button
           id="btn-left-click"
           className="mouse-btn"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_click", button: "left" }); }}
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
+          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "left" }); }}
+          onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
+          onMouseLeave={() => ws.send({ type: "mouse_up", button: "left" })}
         >
           <span>◀</span>
           Left
@@ -208,14 +212,22 @@ export default function TouchpadPanel() {
         <button
           id="btn-middle-click"
           className="mouse-btn mouse-btn-middle"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_click", button: "middle" }); }}
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+          onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
+          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "middle" }); }}
+          onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
+          onMouseLeave={() => ws.send({ type: "mouse_up", button: "middle" })}
         >
           ●
         </button>
         <button
           id="btn-right-click"
           className="mouse-btn"
-          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_click", button: "right" }); }}
+          onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onTouchEnd={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
+          onMouseDown={(e) => { e.preventDefault(); ws.send({ type: "mouse_down", button: "right" }); }}
+          onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
+          onMouseLeave={() => ws.send({ type: "mouse_up", button: "right" })}
         >
           <span>▶</span>
           Right
