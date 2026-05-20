@@ -19,6 +19,7 @@ pub enum RemoteCommand {
     FocusWindow { id: u64 },
     SetClipboard { text: String },
     GetClipboard,
+    MouseMoveAbs { x: i32, y: i32 },
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -95,6 +96,9 @@ impl InputHandler {
             }
             RemoteCommand::Power { ref action } => {
                 handle_power(action)?;
+            }
+            RemoteCommand::MouseMoveAbs { x, y } => {
+                self.enigo.move_mouse(x, y, Coordinate::Abs)?;
             }
             RemoteCommand::GetWindows
             | RemoteCommand::FocusWindow { .. }

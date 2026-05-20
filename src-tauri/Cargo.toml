@@ -35,3 +35,6 @@ local-ip-address = "0.6"
 
 # Clipboard support
 arboard = "3"
+xcap = "0.9.4"
+image = "0.25.10"
+base64 = "0.22.1"

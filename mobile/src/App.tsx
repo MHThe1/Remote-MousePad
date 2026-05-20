@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { ws } from "./ws";
 import TouchpadPanel from "./panels/TouchpadPanel";
+import ScreenPanel from "./panels/ScreenPanel";
 import KeyboardPanel from "./panels/KeyboardPanel";
 import MediaPanel from "./panels/MediaPanel";
 import PowerPanel from "./panels/PowerPanel";
 import AppSwitcherPanel from "./panels/AppSwitcherPanel";
 import "./index.css";
 
-type Panel = "touchpad" | "keyboard" | "media" | "power" | "apps";
+type Panel = "touchpad" | "screen" | "keyboard" | "media" | "power" | "apps";
 
 const TABS: { id: Panel; icon: string; label: string }[] = [
   { id: "touchpad", icon: "🖱️", label: "Mouse" },
+  { id: "screen", icon: "📺", label: "Screen" },
   { id: "keyboard", icon: "⌨️", label: "Keys" },
   { id: "media", icon: "🎵", label: "Media" },
   { id: "power", icon: "⚡", label: "Power" },
@@ -63,6 +65,7 @@ export default function App() {
       {/* Panel */}
       <main className="panel-area">
         {panel === "touchpad" && <TouchpadPanel />}
+        {panel === "screen" && <ScreenPanel />}
         {panel === "keyboard" && <KeyboardPanel />}
         {panel === "media" && <MediaPanel />}
         {panel === "power" && <PowerPanel />}

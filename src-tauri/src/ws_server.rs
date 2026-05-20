@@ -1,8 +1,11 @@
 use crate::input_handler::{InputHandler, RemoteCommand};
 use crate::window_manager::{focus_window, list_windows};
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use futures_util::{SinkExt, StreamExt};
+use image::DynamicImage;
 use serde_json::json;
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
@@ -47,26 +50,58 @@ async fn handle_connection(
         *count += 1;
     }
 
+    // Create a channel for writing to the socket
+    let (tx, mut rx) = tokio::sync::mpsc::channel::<Message>(100);
+    let tx_clone = tx.clone();
+
+    // Spawn a writer task
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            if write.send(msg).await.is_err() {
+                break;
+            }
+        }
+    });
+
     // Create an input handler per connection
     let handler = Arc::new(Mutex::new(InputHandler::new()?));
+
+    // Streaming state
+    let is_streaming = Arc::new(AtomicBool::new(false));
 
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
-                let response = process_message(&text, &handler);
-                if let Some(resp) = response {
-                    if write.send(Message::Text(resp.into())).await.is_err() {
-                        break;
+                if text.contains("\"type\":\"start_screen_stream\"") {
+                    if !is_streaming.load(Ordering::Relaxed) {
+                        is_streaming.store(true, Ordering::Relaxed);
+                        let is_streaming_clone = Arc::clone(&is_streaming);
+                        let tx_clone2 = tx_clone.clone();
+                        tokio::spawn(async move {
+                            if let Err(e) = stream_screen(is_streaming_clone, tx_clone2).await {
+                                eprintln!("[WS] Screen capture stream error: {}", e);
+                            }
+                        });
+                    }
+                } else if text.contains("\"type\":\"stop_screen_stream\"") {
+                    is_streaming.store(false, Ordering::Relaxed);
+                } else {
+                    let response = process_message(&text, &handler);
+                    if let Some(resp) = response {
+                        let _ = tx_clone.send(Message::Text(resp.into())).await;
                     }
                 }
             }
             Ok(Message::Ping(data)) => {
-                let _ = write.send(Message::Pong(data)).await;
+                let _ = tx_clone.send(Message::Pong(data)).await;
             }
             Ok(Message::Close(_)) | Err(_) => break,
             _ => {}
         }
     }
+
+    // Ensure streaming is stopped upon client disconnect
+    is_streaming.store(false, Ordering::Relaxed);
 
     println!("[WS] Disconnected: {}", peer);
     {
@@ -129,4 +164,88 @@ fn process_message(
     }
 
     None
+}
+
+async fn stream_screen(
+    is_streaming: Arc<AtomicBool>,
+    tx: tokio::sync::mpsc::Sender<Message>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    println!("[WS] Starting screen capture stream...");
+
+    // Fetch screen dimensions in a blocking context (xcap::Monitor is !Send)
+    let (screen_w, screen_h) = tokio::task::spawn_blocking(|| {
+        let monitors = xcap::Monitor::all().unwrap_or_default();
+        if let Some(m) = monitors.into_iter().next() {
+            (m.width().unwrap_or(1920), m.height().unwrap_or(1080))
+        } else {
+            (1920u32, 1080u32)
+        }
+    })
+    .await?;
+
+    // Send screen information to client
+    let info_msg = json!({
+        "type": "screen_info",
+        "width": screen_w,
+        "height": screen_h
+    });
+    let _ = tx.send(Message::Text(info_msg.to_string().into())).await;
+
+    while is_streaming.load(Ordering::Relaxed) {
+        let start_time = std::time::Instant::now();
+
+        // Capture + encode entirely in a blocking thread (xcap::Monitor is !Send)
+        let frame_result = tokio::task::spawn_blocking(move || -> Option<Vec<u8>> {
+            let monitors = xcap::Monitor::all().ok()?;
+            let monitor = monitors.into_iter().next()?;
+
+            let rgba_img = monitor.capture_image().ok()?;
+
+            // Drop alpha channel (JPEG does not support alpha)
+            let rgb_img = DynamicImage::ImageRgba8(rgba_img).to_rgb8();
+
+            // Downscale to 960px width to keep frame sizes small (~30-50 KB)
+            let resized = if rgb_img.width() > 960 {
+                let n_width = 960u32;
+                let n_height =
+                    (rgb_img.height() as f32 * (960.0 / rgb_img.width() as f32)) as u32;
+                image::imageops::resize(
+                    &rgb_img,
+                    n_width,
+                    n_height,
+                    image::imageops::FilterType::Triangle,
+                )
+            } else {
+                rgb_img
+            };
+
+            // Encode to JPEG with quality 50 via JpegEncoder
+            use image::codecs::jpeg::JpegEncoder;
+            let mut jpeg_buf = std::io::Cursor::new(Vec::new());
+            let mut encoder = JpegEncoder::new_with_quality(&mut jpeg_buf, 50);
+            encoder.encode_image(&DynamicImage::ImageRgb8(resized)).ok()?;
+            Some(jpeg_buf.into_inner())
+        })
+        .await;
+
+        if let Ok(Some(bytes)) = frame_result {
+            let b64_str = STANDARD.encode(&bytes);
+            let frame_msg = json!({
+                "type": "screen_frame",
+                "image": format!("data:image/jpeg;base64,{}", b64_str)
+            });
+            // try_send drops frames if client is too slow — prevents cumulative lag
+            let _ = tx.try_send(Message::Text(frame_msg.to_string().into()));
+        }
+
+        // Throttle to ~60 FPS (16ms target frame time)
+        let elapsed = start_time.elapsed();
+        let frame_delay = std::time::Duration::from_millis(16);
+        if elapsed < frame_delay {
+            tokio::time::sleep(frame_delay - elapsed).await;
+        }
+    }
+
+    println!("[WS] Screen capture stream stopped.");
+    Ok(())
 }
