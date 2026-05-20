@@ -6,17 +6,18 @@ import KeyboardPanel from "./panels/KeyboardPanel";
 import MediaPanel from "./panels/MediaPanel";
 import PowerPanel from "./panels/PowerPanel";
 import AppSwitcherPanel from "./panels/AppSwitcherPanel";
+import { MousePointer2, Monitor, Keyboard, Music, Power, LayoutGrid, Mouse } from "lucide-react";
 import "./index.css";
 
 type Panel = "touchpad" | "screen" | "keyboard" | "media" | "power" | "apps";
 
-const TABS: { id: Panel; icon: string; label: string }[] = [
-  { id: "touchpad", icon: "🖱️", label: "Mouse" },
-  { id: "screen", icon: "📺", label: "Screen" },
-  { id: "keyboard", icon: "⌨️", label: "Keys" },
-  { id: "media", icon: "🎵", label: "Media" },
-  { id: "power", icon: "⚡", label: "Power" },
-  { id: "apps", icon: "🪟", label: "Apps" },
+const TABS: { id: Panel; icon: React.ReactNode; label: string }[] = [
+  { id: "touchpad", icon: <MousePointer2 size={24} />, label: "Mouse" },
+  { id: "screen", icon: <Monitor size={24} />, label: "Screen" },
+  { id: "keyboard", icon: <Keyboard size={24} />, label: "Keys" },
+  { id: "media", icon: <Music size={24} />, label: "Media" },
+  { id: "power", icon: <Power size={24} />, label: "Power" },
+  { id: "apps", icon: <LayoutGrid size={24} />, label: "Apps" },
 ];
 
 export default function App() {
@@ -55,7 +56,10 @@ export default function App() {
 
       {/* Header */}
       <header className="mobile-header">
-        <div className="mobile-logo">🖱️ MouseRemote</div>
+        <div className="mobile-logo">
+          <Mouse size={24} strokeWidth={2.5} className="logo-icon" /> 
+          MouseRemote
+        </div>
         <div className={`conn-badge ${connected ? "conn" : "disconn"}`}>
           <span className="conn-dot"></span>
           {connected ? "Connected" : "Reconnecting..."}
@@ -81,7 +85,9 @@ export default function App() {
             className={`tab-btn ${panel === t.id ? "active" : ""}`}
             onClick={() => setPanel(t.id)}
           >
-            <span className="tab-icon">{t.icon}</span>
+            <div className="tab-icon-wrapper">
+              <span className="tab-icon">{t.icon}</span>
+            </div>
             <span className="tab-label">{t.label}</span>
           </button>
         ))}
@@ -104,7 +110,9 @@ function ConnectScreen({
   return (
     <div className="connect-overlay">
       <div className="connect-modal">
-        <div className="connect-logo">🖱️</div>
+        <div className="connect-logo">
+          <Mouse size={48} strokeWidth={2} />
+        </div>
         <h1 className="connect-title">MouseRemote</h1>
         <p className="connect-subtitle">Enter your PC's WebSocket address</p>
 

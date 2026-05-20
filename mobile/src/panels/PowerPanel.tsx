@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { ws } from "../ws";
+import { Lock, Moon, RotateCw, Power } from "lucide-react";
 
 interface PowerAction {
   id: string;
-  icon: string;
+  icon: React.ReactNode;
   label: string;
   description: string;
   action: string;
@@ -13,21 +14,21 @@ interface PowerAction {
 const POWER_ACTIONS: PowerAction[] = [
   {
     id: "btn-lock",
-    icon: "🔒",
+    icon: <Lock size={32} />,
     label: "Lock Screen",
     description: "Lock the PC screen",
     action: "lock",
   },
   {
     id: "btn-sleep",
-    icon: "😴",
+    icon: <Moon size={32} />,
     label: "Sleep",
     description: "Put the PC to sleep",
     action: "sleep",
   },
   {
     id: "btn-restart",
-    icon: "🔄",
+    icon: <RotateCw size={32} />,
     label: "Restart",
     description: "Restart in 5 seconds",
     action: "restart",
@@ -35,7 +36,7 @@ const POWER_ACTIONS: PowerAction[] = [
   },
   {
     id: "btn-shutdown",
-    icon: "⏻",
+    icon: <Power size={32} />,
     label: "Shut Down",
     description: "Shut down in 5 seconds",
     action: "shutdown",

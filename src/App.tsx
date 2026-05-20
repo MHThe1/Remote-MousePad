@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import QRCode from "react-qr-code";
+import { Mouse } from "lucide-react";
 import "./index.css";
 
 interface ServerInfo {
@@ -36,7 +37,9 @@ export default function App() {
     <div className="app">
       <header className="header">
         <div className="logo">
-          <div className="logo-icon">🖱️</div>
+          <div className="logo-icon">
+            <Mouse size={20} strokeWidth={2.5} />
+          </div>
           <span className="logo-text">MouseRemote</span>
         </div>
         <div className="status-badge">

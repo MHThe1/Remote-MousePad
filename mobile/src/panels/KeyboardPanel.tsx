@@ -1,19 +1,20 @@
 import { useState, useRef, useEffect } from "react";
 import { ws } from "../ws";
+import { Copy, ClipboardPaste, Scissors, Undo, Redo, SquareAsterisk, Save, Search, Plus, X, Maximize, Settings, ClipboardCopy, Download, Upload } from "lucide-react";
 
 const SHORTCUTS = [
-  { id: "sc-copy", label: "Copy", key: "ctrl+c", icon: "📋" },
-  { id: "sc-paste", label: "Paste", key: "ctrl+v", icon: "📌" },
-  { id: "sc-cut", label: "Cut", key: "ctrl+x", icon: "✂️" },
-  { id: "sc-undo", label: "Undo", key: "ctrl+z", icon: "↩️" },
-  { id: "sc-redo", label: "Redo", key: "ctrl+y", icon: "↪️" },
-  { id: "sc-selectall", label: "Select All", key: "ctrl+a", icon: "🔲" },
-  { id: "sc-save", label: "Save", key: "ctrl+s", icon: "💾" },
-  { id: "sc-find", label: "Find", key: "ctrl+f", icon: "🔍" },
-  { id: "sc-new-tab", label: "New Tab", key: "ctrl+t", icon: "➕" },
-  { id: "sc-close-tab", label: "Close Tab", key: "ctrl+w", icon: "❌" },
-  { id: "sc-fullscreen", label: "Fullscreen", key: "f11", icon: "🖥️" },
-  { id: "sc-task-mgr", label: "Task Mgr", key: "ctrl+shift+escape", icon: "⚙️" },
+  { id: "sc-copy", label: "Copy", key: "ctrl+c", icon: <Copy size={24} /> },
+  { id: "sc-paste", label: "Paste", key: "ctrl+v", icon: <ClipboardPaste size={24} /> },
+  { id: "sc-cut", label: "Cut", key: "ctrl+x", icon: <Scissors size={24} /> },
+  { id: "sc-undo", label: "Undo", key: "ctrl+z", icon: <Undo size={24} /> },
+  { id: "sc-redo", label: "Redo", key: "ctrl+y", icon: <Redo size={24} /> },
+  { id: "sc-selectall", label: "Select All", key: "ctrl+a", icon: <SquareAsterisk size={24} /> },
+  { id: "sc-save", label: "Save", key: "ctrl+s", icon: <Save size={24} /> },
+  { id: "sc-find", label: "Find", key: "ctrl+f", icon: <Search size={24} /> },
+  { id: "sc-new-tab", label: "New Tab", key: "ctrl+t", icon: <Plus size={24} /> },
+  { id: "sc-close-tab", label: "Close Tab", key: "ctrl+w", icon: <X size={24} /> },
+  { id: "sc-fullscreen", label: "Fullscreen", key: "f11", icon: <Maximize size={24} /> },
+  { id: "sc-task-mgr", label: "Task Mgr", key: "ctrl+shift+escape", icon: <Settings size={24} /> },
 ];
 
 const SPECIAL_KEYS = [
@@ -277,7 +278,7 @@ export default function KeyboardPanel() {
         <div className="clipboard-sync-panel">
           <div className="clipboard-card">
             <div className="clipboard-header">
-              <span className="clipboard-art">📋</span>
+              <span className="clipboard-art"><ClipboardCopy size={24} /></span>
               <div className="clipboard-title-group">
                 <span className="clipboard-title">Cross-Origin Clipboard Sync</span>
                 <span className="clipboard-subtitle">Sync clipboard contents securely via WebSocket</span>
@@ -298,7 +299,7 @@ export default function KeyboardPanel() {
                 onClick={handleGetClipboard}
                 title="Fetch PC clipboard"
               >
-                📥 Get from PC
+                <Download size={16} /> Get from PC
               </button>
               <button
                 id="btn-set-pc-clipboard"
@@ -307,7 +308,7 @@ export default function KeyboardPanel() {
                 disabled={!clipText.trim()}
                 title="Send text to PC clipboard"
               >
-                📤 Send to PC
+                <Upload size={16} /> Send to PC
               </button>
               <button
                 id="btn-copy-local-clipboard"
@@ -315,7 +316,7 @@ export default function KeyboardPanel() {
                 onClick={() => copyToPhoneClipboard(clipText)}
                 title="Copy text to phone system clipboard"
               >
-                📋 Copy to Phone
+                <Copy size={16} /> Copy to Phone
               </button>
               <button
                 id="btn-paste-local-clipboard"
@@ -323,7 +324,7 @@ export default function KeyboardPanel() {
                 onClick={pasteFromPhoneClipboard}
                 title="Paste text from phone system clipboard"
               >
-                📝 Paste from Phone
+                <ClipboardPaste size={16} /> Paste from Phone
               </button>
             </div>
           </div>

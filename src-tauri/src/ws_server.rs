@@ -5,7 +5,7 @@ use futures_util::{SinkExt, StreamExt};
 use image::DynamicImage;
 use serde_json::json;
 use std::net::SocketAddr;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tungstenite::{accept_async, tungstenite::Message};
@@ -68,23 +68,42 @@ async fn handle_connection(
 
     // Streaming state
     let is_streaming = Arc::new(AtomicBool::new(false));
+    // Selected monitor index (shared so we can update it mid-stream)
+    let monitor_idx = Arc::new(AtomicUsize::new(0));
 
     while let Some(msg) = read.next().await {
         match msg {
             Ok(Message::Text(text)) => {
+                // ── start_screen_stream ───────────────────────────────────
                 if text.contains("\"type\":\"start_screen_stream\"") {
-                    if !is_streaming.load(Ordering::Relaxed) {
-                        is_streaming.store(true, Ordering::Relaxed);
-                        let is_streaming_clone = Arc::clone(&is_streaming);
-                        let tx_clone2 = tx_clone.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = stream_screen(is_streaming_clone, tx_clone2).await {
-                                eprintln!("[WS] Screen capture stream error: {}", e);
-                            }
-                        });
-                    }
+                    // Parse optional monitor_index from the message
+                    let req_idx: usize = serde_json::from_str::<serde_json::Value>(&text)
+                        .ok()
+                        .and_then(|v| v["monitor_index"].as_u64())
+                        .unwrap_or(0) as usize;
+
+                    // Always stop any previous stream first
+                    is_streaming.store(false, Ordering::Relaxed);
+                    // Small yield so the previous task can see the stop flag
+                    tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+
+                    monitor_idx.store(req_idx, Ordering::Relaxed);
+                    is_streaming.store(true, Ordering::Relaxed);
+
+                    let is_streaming_clone = Arc::clone(&is_streaming);
+                    let tx_clone2 = tx_clone.clone();
+                    let idx = req_idx;
+                    tokio::spawn(async move {
+                        if let Err(e) = stream_screen(is_streaming_clone, tx_clone2, idx).await {
+                            eprintln!("[WS] Screen capture stream error: {}", e);
+                        }
+                    });
+
+                // ── stop_screen_stream ────────────────────────────────────
                 } else if text.contains("\"type\":\"stop_screen_stream\"") {
                     is_streaming.store(false, Ordering::Relaxed);
+
+                // ── All other commands ────────────────────────────────────
                 } else {
                     let response = process_message(&text, &handler);
                     if let Some(resp) = response {
@@ -125,6 +144,33 @@ fn process_message(
     };
 
     match &cmd {
+        // ── List all monitors ─────────────────────────────────────────────
+        RemoteCommand::GetMonitors => {
+            let monitors_info = tokio::task::block_in_place(|| {
+                xcap::Monitor::all()
+                    .unwrap_or_default()
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, m)| {
+                        json!({
+                            "index": i,
+                            "name": m.name().unwrap_or_else(|_| format!("Display {}", i + 1)),
+                            "width": m.width().unwrap_or(1920),
+                            "height": m.height().unwrap_or(1080),
+                            "is_primary": m.is_primary().unwrap_or(i == 0),
+                        })
+                    })
+                    .collect::<Vec<_>>()
+            });
+
+            let resp = json!({
+                "type": "monitors_list",
+                "monitors": monitors_info,
+            });
+            return Some(resp.to_string());
+        }
+
+        // ── Window management ─────────────────────────────────────────────
         RemoteCommand::GetWindows => {
             let windows = list_windows();
             let resp = json!({
@@ -137,6 +183,8 @@ fn process_message(
             focus_window(*id);
             return None;
         }
+
+        // ── Clipboard ─────────────────────────────────────────────────────
         RemoteCommand::SetClipboard { text } => {
             if let Ok(mut cb) = arboard::Clipboard::new() {
                 let _ = cb.set_text(text.clone());
@@ -169,35 +217,52 @@ fn process_message(
 async fn stream_screen(
     is_streaming: Arc<AtomicBool>,
     tx: tokio::sync::mpsc::Sender<Message>,
+    monitor_index: usize,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!("[WS] Starting screen capture stream...");
+    println!("[WS] Starting screen capture stream (monitor {})...", monitor_index);
 
     // Fetch screen dimensions in a blocking context (xcap::Monitor is !Send)
-    let (screen_w, screen_h) = tokio::task::spawn_blocking(|| {
-        let monitors = xcap::Monitor::all().unwrap_or_default();
-        if let Some(m) = monitors.into_iter().next() {
-            (m.width().unwrap_or(1920), m.height().unwrap_or(1080))
-        } else {
-            (1920u32, 1080u32)
-        }
-    })
-    .await?;
+    let (screen_w, screen_h, monitor_name, monitor_count) =
+        tokio::task::spawn_blocking(move || {
+            let monitors = xcap::Monitor::all().unwrap_or_default();
+            let count = monitors.len();
+            let idx = monitor_index.min(count.saturating_sub(1));
+            if let Some(m) = monitors.into_iter().nth(idx) {
+                let name = m
+                    .name()
+                    .unwrap_or_else(|_| format!("Display {}", idx + 1));
+                (
+                    m.width().unwrap_or(1920),
+                    m.height().unwrap_or(1080),
+                    name,
+                    count,
+                )
+            } else {
+                (1920u32, 1080u32, format!("Display {}", idx + 1), 1usize)
+            }
+        })
+        .await?;
 
     // Send screen information to client
     let info_msg = json!({
         "type": "screen_info",
         "width": screen_w,
-        "height": screen_h
+        "height": screen_h,
+        "monitor_index": monitor_index,
+        "monitor_name": monitor_name,
+        "monitor_count": monitor_count,
     });
     let _ = tx.send(Message::Text(info_msg.to_string().into())).await;
 
     while is_streaming.load(Ordering::Relaxed) {
         let start_time = std::time::Instant::now();
 
+        let idx = monitor_index;
+
         // Capture + encode entirely in a blocking thread (xcap::Monitor is !Send)
         let frame_result = tokio::task::spawn_blocking(move || -> Option<Vec<u8>> {
             let monitors = xcap::Monitor::all().ok()?;
-            let monitor = monitors.into_iter().next()?;
+            let monitor = monitors.into_iter().nth(idx)?;
 
             let rgba_img = monitor.capture_image().ok()?;
 
@@ -246,6 +311,6 @@ async fn stream_screen(
         }
     }
 
-    println!("[WS] Screen capture stream stopped.");
+    println!("[WS] Screen capture stream stopped (monitor {}).", monitor_index);
     Ok(())
 }

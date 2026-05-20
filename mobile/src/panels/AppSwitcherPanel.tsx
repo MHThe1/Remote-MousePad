@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { ws } from "../ws";
+import { Loader2, RefreshCw, Monitor, ChevronRight, Globe, Code, Folder, FileText, Terminal, Music, MessageCircle, Users, Briefcase, Video } from "lucide-react";
 
 interface WindowInfo {
   id: number;
@@ -38,25 +39,24 @@ export default function AppSwitcherPanel() {
     w.title.toLowerCase().includes(filter.toLowerCase())
   );
 
-  // Emoji for common apps
   const getIcon = (title: string) => {
     const t = title.toLowerCase();
-    if (t.includes("chrome") || t.includes("chromium")) return "🌐";
-    if (t.includes("firefox")) return "🦊";
-    if (t.includes("edge")) return "🌀";
-    if (t.includes("code") || t.includes("vscode")) return "💻";
-    if (t.includes("explorer")) return "📁";
-    if (t.includes("notepad")) return "📝";
-    if (t.includes("terminal") || t.includes("powershell") || t.includes("cmd")) return "⌨️";
-    if (t.includes("spotify")) return "🎵";
-    if (t.includes("discord")) return "💬";
-    if (t.includes("word")) return "📄";
-    if (t.includes("excel")) return "📊";
-    if (t.includes("powerpoint")) return "📊";
-    if (t.includes("teams")) return "👥";
-    if (t.includes("slack")) return "💼";
-    if (t.includes("zoom")) return "📹";
-    return "🖥️";
+    if (t.includes("chrome") || t.includes("chromium")) return <Globe size={20} />;
+    if (t.includes("firefox")) return <Globe size={20} />;
+    if (t.includes("edge")) return <Globe size={20} />;
+    if (t.includes("code") || t.includes("vscode")) return <Code size={20} />;
+    if (t.includes("explorer")) return <Folder size={20} />;
+    if (t.includes("notepad")) return <FileText size={20} />;
+    if (t.includes("terminal") || t.includes("powershell") || t.includes("cmd")) return <Terminal size={20} />;
+    if (t.includes("spotify")) return <Music size={20} />;
+    if (t.includes("discord")) return <MessageCircle size={20} />;
+    if (t.includes("word")) return <FileText size={20} />;
+    if (t.includes("excel")) return <FileText size={20} />;
+    if (t.includes("powerpoint")) return <Video size={20} />;
+    if (t.includes("teams")) return <Users size={20} />;
+    if (t.includes("slack")) return <Briefcase size={20} />;
+    if (t.includes("zoom")) return <Video size={20} />;
+    return <Monitor size={20} />;
   };
 
   return (
@@ -76,13 +76,13 @@ export default function AppSwitcherPanel() {
           onClick={fetchWindows}
           disabled={loading}
         >
-          {loading ? "⏳" : "🔄"}
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
         </button>
       </div>
 
       {filtered.length === 0 && !loading && (
         <div className="empty-state">
-          <div className="empty-icon">🖥️</div>
+          <div className="empty-icon"><Monitor size={48} strokeWidth={1.5} /></div>
           <p>{windows.length === 0 ? "Press refresh to load open windows" : "No windows match your search"}</p>
         </div>
       )}
@@ -97,7 +97,7 @@ export default function AppSwitcherPanel() {
           >
             <span className="app-item-icon">{getIcon(w.title)}</span>
             <span className="app-item-title">{w.title}</span>
-            <span className="app-item-arrow">›</span>
+            <span className="app-item-arrow"><ChevronRight size={16} /></span>
           </button>
         ))}
       </div>

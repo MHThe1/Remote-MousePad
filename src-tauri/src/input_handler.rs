@@ -16,6 +16,7 @@ pub enum RemoteCommand {
     Media { action: MediaAction },
     Power { action: PowerAction },
     GetWindows,
+    GetMonitors,
     FocusWindow { id: u64 },
     SetClipboard { text: String },
     GetClipboard,
@@ -101,6 +102,7 @@ impl InputHandler {
                 self.enigo.move_mouse(x, y, Coordinate::Abs)?;
             }
             RemoteCommand::GetWindows
+            | RemoteCommand::GetMonitors
             | RemoteCommand::FocusWindow { .. }
             | RemoteCommand::SetClipboard { .. }
             | RemoteCommand::GetClipboard => {

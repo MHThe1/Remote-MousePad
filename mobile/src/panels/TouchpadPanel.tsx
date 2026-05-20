@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ws } from "../ws";
-
-
+import { Keyboard, Hand, MousePointerClick, ChevronUp, ChevronDown, Disc } from "lucide-react";
 export default function TouchpadPanel() {
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [textInput, setTextInput] = useState("");
@@ -157,7 +156,7 @@ export default function TouchpadPanel() {
           onClick={toggleKeyboard}
           aria-label="Toggle Virtual Keyboard"
         >
-          ⌨️
+          <Keyboard size={20} />
         </button>
 
         {/* Sleek inline Quick Type bar */}
@@ -189,7 +188,7 @@ export default function TouchpadPanel() {
           onTouchEnd={onTouchEnd}
         >
           <div className="touchpad-hint">
-            <span className="touchpad-icon">☝️</span>
+            <span className="touchpad-icon"><Hand size={32} strokeWidth={1.5} /></span>
             <p>Drag to move cursor</p>
             <p className="sub">Tap = left click · 2 fingers = scroll</p>
           </div>
@@ -206,7 +205,7 @@ export default function TouchpadPanel() {
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "left" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "left" })}
         >
-          <span>◀</span>
+          <MousePointerClick size={16} />
           Left
         </button>
         <button
@@ -218,7 +217,7 @@ export default function TouchpadPanel() {
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "middle" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "middle" })}
         >
-          ●
+          <Disc size={16} />
         </button>
         <button
           id="btn-right-click"
@@ -229,8 +228,8 @@ export default function TouchpadPanel() {
           onMouseUp={(e) => { e.preventDefault(); ws.send({ type: "mouse_up", button: "right" }); }}
           onMouseLeave={() => ws.send({ type: "mouse_up", button: "right" })}
         >
-          <span>▶</span>
           Right
+          <MousePointerClick size={16} style={{ transform: "scaleX(-1)" }} />
         </button>
       </div>
 
@@ -240,14 +239,14 @@ export default function TouchpadPanel() {
           className="scroll-btn"
           onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: 3 }); }}
         >
-          ▲ Scroll Up
+          <ChevronUp size={16} /> Scroll Up
         </button>
         <button
           id="btn-scroll-down"
           className="scroll-btn"
           onTouchStart={(e) => { e.preventDefault(); ws.send({ type: "scroll", dx: 0, dy: -3 }); }}
         >
-          ▼ Scroll Down
+          <ChevronDown size={16} /> Scroll Down
         </button>
       </div>
     </div>
